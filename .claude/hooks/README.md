@@ -19,7 +19,31 @@ correct.
 | Disabling RLS, granting `anon` access to `ride`/`profiles`, `USING (true)` policies | `guard.mjs` | CLAUDE.md §2 |
 | Stored `credit_count` column or `credits` table | `guard.mjs` | CLAUDE.md §3 |
 | Ad-hoc DDL through `execute_sql` | `guard.mjs` | steered to `supabase/migrations/` |
-| Everything reaching the hosted project | `--read-only` in `.mcp.json` | the strongest of these |
+| Everything reaching the hosted project | ~~`--read-only` in `.mcp.json`~~ | **no longer in force — see below** |
+
+### The `--read-only` flag is gone
+
+`.mcp.json` now points at the hosted server (`mcp.supabase.com`) over HTTP with OAuth,
+which replaced the local `pnpm dlx @supabase/mcp-server-supabase --read-only` invocation.
+The intent is deliberate: the agent should be able to create and alter models, so
+read-only would block the work. Add `&read_only=true` to the URL to put it back.
+
+With that flag gone, `guard.mjs` is the *only* thing standing between the agent and a
+`DROP` on the hosted project. Which makes the matcher below load-bearing.
+
+### The matcher must follow the tool, not the server name
+
+The hosted MCP registers its tools under an opaque per-connection id —
+`mcp__<uuid>__execute_sql`, not `mcp__supabase__execute_sql`. A matcher keyed on the
+literal string `supabase` silently stopped firing when the server was switched, and the
+same `drop table ride` that had been denied started coming back allowed. Both the
+`settings.json` matcher and the dispatch check in `guard.mjs` now key on
+`mcp__.*(supabase|execute_sql|apply_migration)` instead, and the self-test pins a DROP
+under both names.
+
+It is deliberately not a bare `mcp__.*`: other connected servers take a `query` input
+too, and screening their searches as SQL would deny a Slack search for "drop table".
+There are near-miss cases for that in the self-test.
 
 ## This is a guardrail, not a security boundary
 

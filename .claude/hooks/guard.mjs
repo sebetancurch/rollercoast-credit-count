@@ -292,7 +292,13 @@ function evaluate(payload) {
     return ALLOW;
   }
 
-  if (/^mcp__supabase/i.test(toolName)) {
+  // Matches the SQL-bearing MCP tools whatever the server is registered as. The
+  // hosted Supabase MCP surfaces its tools under an opaque per-connection id
+  // (mcp__<uuid>__execute_sql), so keying on the literal name "supabase" left
+  // every DROP through unscreened. Deliberately NOT a bare /^mcp__/: other
+  // connected servers also take a `query` input, and screening their searches
+  // as if they were SQL would deny things like a Slack search for "drop table".
+  if (/^mcp__.*(supabase|execute_sql|apply_migration)/i.test(toolName)) {
     const sql = String(input.query ?? input.sql ?? input.statement ?? "");
     if (!sql.trim()) return ALLOW;
     return checkSql(sql, toolName);
@@ -366,6 +372,32 @@ const CASES = [
   ["mcp__supabase__apply_migration", { query: "grant select on public_leaderboard to anon" }, null],
   ["mcp__supabase__execute_sql", { query: "create table coasters (id uuid primary key)" }, "deny"],
   ["mcp__supabase__apply_migration", { query: "create table coasters (id uuid primary key)" }, null],
+
+  // The hosted MCP registers its tools under an opaque per-connection id rather
+  // than the name in .mcp.json, and that id changes between connections — the
+  // one below is a placeholder standing in for "any opaque id", not a real
+  // server. These pin that the screening follows the tool, not the server
+  // label: the same DROP must be denied whatever the prefix.
+  ["mcp__00000000-0000-0000-0000-000000000000__execute_sql", { query: "drop table ride" }, "deny"],
+  ["mcp__00000000-0000-0000-0000-000000000000__execute_sql", { query: "truncate coasters" }, "deny"],
+  [
+    "mcp__00000000-0000-0000-0000-000000000000__apply_migration",
+    { query: "alter table ride disable row level security" },
+    "deny",
+  ],
+  [
+    "mcp__00000000-0000-0000-0000-000000000000__apply_migration",
+    { query: "create table coasters (id uuid primary key)" },
+    null,
+  ],
+  // Near-misses: a non-SQL tool takes a `query` input too, and screening it as
+  // SQL would deny an ordinary search. Only the SQL-bearing tools are matched.
+  [
+    "mcp__00000000-0000-0000-0000-000000000000__search_docs",
+    { query: "how to drop a table" },
+    null,
+  ],
+  ["mcp__11111111-1111-1111-1111-111111111111__slack_search_public", { query: "drop table ride" }, null],
   [
     "mcp__supabase__apply_migration",
     { query: "create function f() returns int language sql security definer as $$ select 1 $$" },

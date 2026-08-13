@@ -64,7 +64,7 @@
         ]
       },
       {
-        "matcher": "mcp__supabase.*",
+        "matcher": "mcp__.*(supabase|execute_sql|apply_migration)",
         "hooks": [
           {
             "type": "command",
