@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.development)",
+      "Read(./.env.development.local)",
+      "Read(./.env.test)",
+      "Read(./.env.test.local)",
+      "Read(./.env.production)",
+      "Read(./.env.production.local)",
+      "Edit(./.env)",
+      "Edit(./.env.local)",
+      "Edit(./.env.development)",
+      "Edit(./.env.development.local)",
+      "Edit(./.env.test)",
+      "Edit(./.env.test.local)",
+      "Edit(./.env.production)",
+      "Edit(./.env.production.local)",
+      "Read(./.npmrc)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/*.p12)",
+      "Read(./**/*.pfx)",
+      "Read(./supabase/.temp/**)",
+      "Read(./supabase/.branches/**)"
+    ],
+
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(supabase status)",
+      "Bash(supabase migration list)",
+      "Bash(supabase gen types:*)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/guard.mjs"],
+            "timeout": 10,
+            "statusMessage": "Screening command..."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__supabase.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/guard.mjs"],
+            "timeout": 10,
+            "statusMessage": "Screening SQL..."
+          }
+        ]
+      }
+    ]
+  },
+
+  "enableAllProjectMcpServers": false,
+  "enabledMcpjsonServers": ["supabase"]
+}

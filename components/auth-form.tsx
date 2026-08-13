@@ -1,0 +1,142 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+
+import { signIn, signUp, type AuthState } from "@/app/(auth)/actions";
+
+/**
+ * Sign in / sign up. One component, two routes: the segmented control is a pair
+ * of links rather than local state so each mode has its own URL.
+ *
+ * Validation runs in the server action, not here — the action is a public
+ * endpoint and is the only place a check counts. These messages are whatever it
+ * sends back.
+ */
+
+function Submit({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
+      {pending ? "Working…" : label}
+    </button>
+  );
+}
+
+export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
+  const isSignUp = mode === "signup";
+  const [state, formAction] = useActionState<AuthState, FormData>(
+    isSignUp ? signUp : signIn,
+    null,
+  );
+  const errors = state?.errors ?? {};
+
+  return (
+    <div className="cc-split cc-split--auth">
+      <div>
+        <h1 style={{ fontSize: 38, marginBottom: "var(--space-4)" }}>
+          {isSignUp ? "Start your credit count" : "Welcome back"}
+        </h1>
+
+        <div className="seg" style={{ marginBottom: "var(--space-6)" }}>
+          <Link
+            href="/login"
+            className="seg-opt"
+            aria-current={!isSignUp ? "page" : undefined}
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
+            className="seg-opt"
+            aria-current={isSignUp ? "page" : undefined}
+          >
+            Sign up
+          </Link>
+        </div>
+
+        <form action={formAction} className="cc-stack" noValidate>
+          {isSignUp ? (
+            <div className="field">
+              <label htmlFor="cc-name">Display name</label>
+              <input
+                className="input"
+                id="cc-name"
+                name="displayName"
+                autoComplete="nickname"
+                placeholder="How you appear on the leaderboard"
+                aria-invalid={errors.displayName ? true : undefined}
+                aria-describedby="cc-name-error"
+              />
+              <div className="cc-field-error" id="cc-name-error">
+                {errors.displayName}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="field">
+            <label htmlFor="cc-email">Email</label>
+            <input
+              className="input"
+              id="cc-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              aria-invalid={errors.email ? true : undefined}
+              aria-describedby="cc-email-error"
+            />
+            <div className="cc-field-error" id="cc-email-error">
+              {errors.email}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="cc-pass">Password</label>
+            <input
+              className="input"
+              id="cc-pass"
+              name="password"
+              type="password"
+              autoComplete={isSignUp ? "new-password" : "current-password"}
+              placeholder="At least 8 characters"
+              aria-invalid={errors.password ? true : undefined}
+              aria-describedby="cc-pass-error"
+            />
+            <div className="cc-field-error" id="cc-pass-error">
+              {errors.password}
+            </div>
+          </div>
+
+          {errors._ ? (
+            <div className="cc-field-error" role="alert">
+              {errors._}
+            </div>
+          ) : null}
+
+          <Submit label={isSignUp ? "Create account" : "Sign in"} />
+
+          <p className="text-muted" style={{ fontSize: 12, marginTop: "var(--space-1)" }}>
+            Email and password only. No third-party sign-in in v1.
+          </p>
+        </form>
+      </div>
+
+      <div style={{ paddingTop: "var(--space-6)", maxWidth: "44ch" }}>
+        <h6 style={{ color: "var(--color-accent)" }}>Private by default</h6>
+        <p className="cc-prose cc-prose--lg">
+          Your ride history — which coasters, which dates, your notes — is visible to you
+          and nobody else. Not other enthusiasts, not admins.
+        </p>
+        <h6 style={{ color: "var(--color-accent)", marginTop: "var(--space-6)" }}>
+          The leaderboard is a choice
+        </h6>
+        <p className="cc-prose cc-prose--lg">
+          You start off it. One switch on your dashboard puts your display name and credit
+          count on the public board, and the same switch takes them off again.
+        </p>
+      </div>
+    </div>
+  );
+}

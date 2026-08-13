@@ -1,0 +1,6 @@
+# pnpm 11 reads settings from here, not from a "pnpm" field in package.json.
+# Both of these ship native binaries and need their install script to run:
+# esbuild is vitest's transform, unrs-resolver is the eslint import resolver.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

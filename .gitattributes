@@ -1,0 +1,10 @@
+# Normalise to LF in the repository. Without this, a Windows checkout commits
+# CRLF and the whole tree reads as modified on macOS or Linux.
+* text=auto eol=lf
+
+# Binary — never touch these.
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
+*.pdf binary
