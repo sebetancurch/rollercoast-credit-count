@@ -71,6 +71,25 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
   const supabase = await createClient();
+
+  // Check the display name before creating anything. profiles.username is
+  // unique, and handle_new_user() resolves a collision by appending a suffix —
+  // so without this you would silently end up as "Sergio-a1b2c3d4" and never be
+  // told. That suffix stays as the fallback for the race between this check and
+  // the insert; it should now be unreachable in normal use.
+  const { data: available, error: availabilityError } = await supabase.rpc(
+    "username_available",
+    { p_username: parsed.data.displayName },
+  );
+  if (availabilityError) {
+    return { errors: { _: "Could not create that account." } };
+  }
+  if (available === false) {
+    return {
+      errors: { displayName: "That display name is taken. Try another." },
+    };
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,

@@ -145,6 +145,7 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      username_available: { Args: { p_username: string }; Returns: boolean }
     }
     Enums: {
       coaster_type: "Steel" | "Wooden" | "Hybrid"

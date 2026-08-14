@@ -158,6 +158,43 @@ describe("coaster catalogue", () => {
   });
 });
 
+describe("username availability", () => {
+  it("is callable without a session, because signup has none yet", async () => {
+    const { data, error } = await anonClient().rpc("username_available", {
+      p_username: users.cass.username,
+    });
+
+    expect(error).toBeNull();
+    expect(data).toBe(false);
+  });
+
+  it("reports a free name as available", async () => {
+    const { data, error } = await anonClient().rpc("username_available", {
+      p_username: "Nobody At All",
+    });
+
+    expect(error).toBeNull();
+    expect(data).toBe(true);
+  });
+
+  it("returns a bare boolean, never a row", async () => {
+    const { data } = await anonClient().rpc("username_available", {
+      p_username: users.priya.username,
+    });
+
+    // The whole reason this is safe to expose: there is no shape in which a
+    // profile, an id or anyone else's name comes back out of it.
+    expect(typeof data).toBe("boolean");
+  });
+
+  it("still cannot be used to read the profiles it consults", async () => {
+    const { data, error } = await anonClient().from("profiles").select("username");
+
+    expect(data).toBeNull();
+    expect(error).toBeTruthy();
+  });
+});
+
 describe("privilege escalation", () => {
   it("refuses to let an enthusiast promote themselves to admin", async () => {
     const priya = await asPriya();

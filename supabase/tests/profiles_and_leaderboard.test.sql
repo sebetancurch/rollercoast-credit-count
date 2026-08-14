@@ -2,7 +2,7 @@
 -- does and does not publish.
 
 begin;
-select plan(13);
+select plan(19);
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
@@ -113,6 +113,67 @@ select is(
   (select count(*)::int from public.public_leaderboard),
   7,
   'and that single switch is what puts them on the board'
+);
+
+-- ── display-name availability ─────────────────────────────────────────────
+-- The signup form needs this before a session exists, so anon must be able to
+-- call it, and it must agree with the unique constraint exactly.
+
+reset role;
+set local role anon;
+
+select is(
+  (select public.username_available('Nobody At All')),
+  true,
+  'a free name is reported as available'
+);
+
+select is(
+  (select public.username_available('  Priya Raghavan  ')),
+  false,
+  'the check trims, because handle_new_user trims before inserting'
+);
+
+select is(
+  (select public.username_available('priya raghavan')),
+  true,
+  'the comparison is case-sensitive, matching the unique constraint'
+);
+
+select ok(
+  has_function_privilege('anon', 'public.username_available(text)', 'execute'),
+  'anon can execute it — the signup form calls it before any session exists'
+);
+
+-- The rest needs to read profiles, which anon deliberately cannot do. That the
+-- four assertions above worked *without* that access is the point: the function
+-- crosses the boundary, the caller does not.
+reset role;
+
+-- Self-referential rather than naming a seeded user: assertions earlier in this
+-- transaction rename one, and a test that depends on data an earlier test
+-- mutated fails for the wrong reason.
+select is(
+  (select count(*)::int from public.profiles p where public.username_available(p.username)),
+  0,
+  'every name currently in profiles reports as taken'
+);
+
+-- The property that makes the check worth having: "available" has to mean
+-- "will insert". That only holds because the column is unique and the function
+-- compares the same way it does.
+select is(
+  (select count(*)::int
+   from pg_constraint c
+   join pg_class t on t.oid = c.conrelid
+   join pg_namespace n on n.oid = t.relnamespace
+   join pg_attribute a on a.attrelid = t.oid and a.attnum = any (c.conkey)
+   where n.nspname = 'public'
+     and t.relname = 'profiles'
+     and c.contype = 'u'
+     and a.attname = 'username'),
+  1,
+  'profiles.username carries the unique constraint the check mirrors'
 );
 
 select * from finish();

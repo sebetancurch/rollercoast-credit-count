@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Credit Count">
+  <!--
+    A coaster in one stroke: lift hill, drop, loop, run-out.
+
+    Broadsheet tokens, hard-coded because an SVG asset cannot read the CSS
+    variables — paper #f3f2f2, accent cyan #0088b0. Kept to one heavy stroke
+    with no fine detail, because this is read at 16px far more often than at 32.
+  -->
+  <rect width="32" height="32" rx="2" fill="#f3f2f2" />
+  <g fill="none" stroke="#0088b0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- lift and drop -->
+    <path d="M4 25 L4 9 L11 9" />
+    <!-- the loop -->
+    <circle cx="17.5" cy="16.5" r="5.5" />
+    <!-- run-out -->
+    <path d="M23 22 Q26 25 28 25" />
+  </g>
+</svg>
