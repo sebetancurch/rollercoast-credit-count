@@ -1,41 +1,20 @@
 /**
  * Ride history reads — the private half of the product.
  *
- * Every function takes the user id explicitly and filters on it. In step 2 that
- * filter becomes redundant, because RLS scopes the query to the caller anyway;
- * keeping it here means the mock behaves the same way the database will, and it
- * documents that no read is ever unscoped.
+ * Every function takes the user id explicitly and filters on it. Under RLS that
+ * filter is redundant: the policies scope every statement to the caller anyway,
+ * and the tests prove it. It stays because a query that says who it is for is
+ * easier to review than one that relies on the reader knowing about a policy,
+ * and because a missing filter would then be a visible bug rather than an
+ * invisible dependence on the database being configured correctly.
  */
 
 import "server-only";
 
-import { isMockMode } from "@/lib/env";
-import { store } from "@/lib/mock/store";
+import { RIDE_SELECT } from "@/lib/data/selects";
+import { createClient } from "@/lib/supabase/server";
 import { computeDashboardStats, type DashboardStats } from "@/lib/stats";
 import type { RideWithCoaster } from "@/lib/types";
-
-function joinCoaster(userId: string): RideWithCoaster[] {
-  if (!isMockMode) {
-    throw new Error("Supabase ride reads are not wired up yet (step 2).");
-  }
-  const s = store();
-  const byId = new Map(s.coasters.map((c) => [c.id, c]));
-
-  return s.rides
-    .filter((r) => r.user_id === userId)
-    .flatMap((r) => {
-      const coaster = byId.get(r.coaster_id);
-      // A coaster removed from the catalogue orphans its rides. The database
-      // will decide this with a foreign key; here we simply drop them.
-      return coaster ? [{ ...r, coaster: { ...coaster } }] : [];
-    });
-}
-
-/** Newest first — every ride list in the design is reverse-chronological. */
-function byDateDesc(a: RideWithCoaster, b: RideWithCoaster): number {
-  if (a.ridden_on !== b.ridden_on) return a.ridden_on < b.ridden_on ? 1 : -1;
-  return a.id < b.id ? 1 : -1;
-}
 
 export type RideFilters = {
   /** Matches coaster name, park, country or manufacturer. */
@@ -49,46 +28,81 @@ export async function listRides(
   userId: string,
   filters: RideFilters = {},
 ): Promise<RideWithCoaster[]> {
-  // Step 2: supabase.from("ride").select("*, coaster:coasters(*)")
-  //         .order("ridden_on", { ascending: false })
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("ride")
+    .select(RIDE_SELECT)
+    .eq("user_id", userId)
+    .order("ridden_on", { ascending: false })
+    // A stable second key, so two rides on the same day keep their order
+    // between renders.
+    .order("id", { ascending: false });
+
+  if (filters.coasterId) query = query.eq("coaster_id", filters.coasterId);
+  if (filters.limit) query = query.limit(filters.limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = (data ?? []) as unknown as RideWithCoaster[];
+
+  // Applied here rather than as an embedded filter: it spans four columns of
+  // the joined coaster, and the rows are already scoped to one user.
   const q = filters.query?.trim().toLowerCase() ?? "";
+  if (!q) return rows;
 
-  const rows = joinCoaster(userId)
-    .filter((r) => {
-      if (filters.coasterId && r.coaster_id !== filters.coasterId) return false;
-      if (!q) return true;
-      const c = r.coaster;
-      return `${c.name} ${c.park} ${c.country} ${c.manufacturer}`
-        .toLowerCase()
-        .includes(q);
-    })
-    .sort(byDateDesc);
-
-  return filters.limit ? rows.slice(0, filters.limit) : rows;
+  return rows.filter((ride) =>
+    `${ride.coaster.name} ${ride.coaster.park} ${ride.coaster.country} ${ride.coaster.manufacturer}`
+      .toLowerCase()
+      .includes(q),
+  );
 }
 
 export async function getRide(
   userId: string,
   rideId: string,
 ): Promise<RideWithCoaster | null> {
-  return joinCoaster(userId).find((r) => r.id === rideId) ?? null;
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ride")
+    .select(RIDE_SELECT)
+    .eq("user_id", userId)
+    .eq("id", rideId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as unknown as RideWithCoaster | null) ?? null;
 }
 
 /**
  * The dashboard's whole numbers, derived from the ride list on every call.
- * No stored count, per CLAUDE.md §3 — see lib/stats.ts.
+ *
+ * No stored count anywhere, per CLAUDE.md §3. The ride-history page needs every
+ * row regardless, so one joined select serves both and there is nothing that
+ * can drift. If this ever gets slow the fix is an index or a definer function —
+ * never a stored column.
  */
 export async function getDashboardStats(userId: string): Promise<DashboardStats> {
-  return computeDashboardStats(joinCoaster(userId));
+  return computeDashboardStats(await listRides(userId));
 }
 
 /** Ride counts per coaster id, for the "Ridden 3×" / "New credit" badges. */
 export async function getRideCountsByCoaster(
   userId: string,
 ): Promise<Record<string, number>> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ride")
+    .select("coaster_id")
+    .eq("user_id", userId);
+  if (error) throw error;
+
   const counts: Record<string, number> = {};
-  for (const ride of joinCoaster(userId)) {
-    counts[ride.coaster_id] = (counts[ride.coaster_id] ?? 0) + 1;
+  for (const row of data ?? []) {
+    counts[row.coaster_id] = (counts[row.coaster_id] ?? 0) + 1;
   }
   return counts;
 }

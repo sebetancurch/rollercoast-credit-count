@@ -10,7 +10,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:unit": "vitest run tests/unit",
+    "test:rls": "vitest run tests/rls",
+    "test:watch": "vitest",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:types": "supabase gen types typescript --local > lib/database.types.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -34,6 +39,7 @@
     "@types/topojson-client": "^3.1.5",
     "eslint": "^9.39.0",
     "eslint-config-next": "^16.3.0",
+    "supabase": "^2.114.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

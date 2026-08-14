@@ -4,26 +4,18 @@ import { revalidatePath } from "next/cache";
 
 import type { ActionResult } from "@/app/dashboard/actions";
 import { requireAdmin } from "@/lib/auth/session";
-import { isMockMode } from "@/lib/env";
-import { nextId, store } from "@/lib/mock/store";
+import { createClient } from "@/lib/supabase/server";
 import { COASTER_FORM_ERROR, coasterSchema } from "@/lib/validation";
 import type { CoasterType } from "@/lib/types";
 
 /**
  * Catalogue mutations — admins only.
  *
- * Every action re-reads the session and checks the role, because rendering the
- * page behind a guard says nothing about who is POSTing to the action. In
- * step 2 the same restriction is expressed as RLS policies on `coasters` that
- * grant INSERT, UPDATE and DELETE to admins alone, which is what will hold when
- * someone bypasses the UI entirely.
+ * Every action re-reads the session, because rendering the page behind a guard
+ * says nothing about who is POSTing here. The role check that actually holds is
+ * the RLS policy on `coasters`, which calls is_admin() and so applies to any
+ * request, including one that never touches this file.
  */
-
-function assertMock() {
-  if (!isMockMode) {
-    throw new Error("Supabase writes are not wired up yet. Leave USE_MOCK_DATA=true.");
-  }
-}
 
 function revalidateCatalogue() {
   revalidatePath("/admin/coasters");
@@ -38,16 +30,21 @@ export async function createCoaster(input: unknown): Promise<ActionResult> {
   const parsed = coasterSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: COASTER_FORM_ERROR };
 
-  assertMock();
-  // Step 2: supabase.from("coasters").insert(parsed.data)
-  store().coasters.push({
-    id: nextId("coaster"),
+  const supabase = await createClient();
+  const { error } = await supabase.from("coasters").insert({
     name: parsed.data.name,
     park: parsed.data.park,
     country: parsed.data.country,
     manufacturer: parsed.data.manufacturer,
     type: parsed.data.type as CoasterType,
   });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, error: "Only admins can change the catalogue." };
+    }
+    return { ok: false, error: "Could not add that coaster." };
+  }
 
   revalidateCatalogue();
   return { ok: true };
@@ -59,15 +56,23 @@ export async function updateCoaster(id: string, input: unknown): Promise<ActionR
   const parsed = coasterSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: COASTER_FORM_ERROR };
 
-  assertMock();
-  const coaster = store().coasters.find((c) => c.id === id);
-  if (!coaster) return { ok: false, error: "That coaster is no longer in the catalogue." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("coasters")
+    .update({
+      name: parsed.data.name,
+      park: parsed.data.park,
+      country: parsed.data.country,
+      manufacturer: parsed.data.manufacturer,
+      type: parsed.data.type as CoasterType,
+    })
+    .eq("id", id)
+    .select("id");
 
-  coaster.name = parsed.data.name;
-  coaster.park = parsed.data.park;
-  coaster.country = parsed.data.country;
-  coaster.manufacturer = parsed.data.manufacturer;
-  coaster.type = parsed.data.type as CoasterType;
+  if (error) return { ok: false, error: "Could not save those changes." };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "That coaster is no longer in the catalogue." };
+  }
 
   revalidateCatalogue();
   return { ok: true };
@@ -79,17 +84,30 @@ export async function deleteCoaster(id: string): Promise<ActionResult> {
     return { ok: false, error: "That coaster is no longer in the catalogue." };
   }
 
-  assertMock();
-  const s = store();
-  const before = s.coasters.length;
-  s.coasters = s.coasters.filter((c) => c.id !== id);
-  if (s.coasters.length === before) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("coasters")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    // 23503: rides still reference it. `on delete restrict` is deliberate — a
+    // cascade would silently rewrite other people's credit counts. Surface it
+    // rather than swallowing it.
+    if (error.code === "23503") {
+      return {
+        ok: false,
+        error:
+          "Members have logged rides on this coaster, so it cannot be removed. " +
+          "Removing it would change their credit counts.",
+      };
+    }
+    return { ok: false, error: "Could not remove that coaster." };
+  }
+  if (!data || data.length === 0) {
     return { ok: false, error: "That coaster is no longer in the catalogue." };
   }
-
-  // Rides pointing at it are orphaned. The database will settle this with a
-  // foreign key — restrict, or cascade — which is a step-2 decision; the mock
-  // read layer simply drops them.
 
   revalidateCatalogue();
   return { ok: true };

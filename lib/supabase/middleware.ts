@@ -2,8 +2,7 @@
  * Session refresh.
  *
  * Server Components cannot write cookies, so without this the auth token
- * expires and never renews. Unused while USE_MOCK_DATA is on; wired up in
- * step 2 by middleware.ts.
+ * expires and never renews. Called on every matched request by proxy.ts.
  */
 
 import { createServerClient } from "@supabase/ssr";

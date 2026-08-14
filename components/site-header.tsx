@@ -2,10 +2,7 @@ import Link from "next/link";
 
 import { signOut } from "@/app/(auth)/actions";
 import { NavLink } from "@/components/nav-link";
-import { RoleSwitcher } from "@/components/role-switcher";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isMockMode } from "@/lib/env";
-import { hasRideHistory } from "@/lib/mock/store";
 
 /**
  * Role-aware navigation.
@@ -16,20 +13,13 @@ import { hasRideHistory } from "@/lib/mock/store";
  * have no business in anyone's ride data.
  *
  * Hiding a link is presentation, not protection. The layouts under /dashboard
- * and /admin guard themselves, and RLS will be what actually decides.
+ * and /admin guard themselves, and RLS is what actually decides.
  */
 export async function SiteHeader() {
   const user = await getCurrentUser();
 
   return (
     <header className="cc-header">
-      {isMockMode ? (
-        <RoleSwitcher
-          role={user?.role ?? "visitor"}
-          seeded={user ? hasRideHistory(user.id) : true}
-        />
-      ) : null}
-
       <div className="cc-gutter">
         <nav className="nav cc-nav" aria-label="Main">
           <Link href="/" className="nav-brand cc-brand">

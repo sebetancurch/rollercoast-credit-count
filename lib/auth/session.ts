@@ -1,84 +1,58 @@
 /**
- * The session seam.
+ * The session.
  *
  * Every server component, layout guard and server action reads the current user
- * from here and nowhere else. Today the mock branch reads a cookie set by the
- * dev role switcher; in step 2 the real branch below takes over and no caller
- * changes.
+ * from here and nowhere else.
  *
- * The real branch uses `getUser()`, never `getSession()`: getSession trusts a
- * cookie the client can write, getUser revalidates the JWT with the Auth
- * server. Every authorization decision on the server must come from getUser().
+ * `getUser()`, never `getSession()`. getSession reads the session out of a
+ * cookie the client can write and returns it without checking whether it is
+ * genuine; getUser revalidates the JWT with the Auth server. Every
+ * authorization decision on the server has to come from getUser().
  */
 
 import "server-only";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ROLE_COOKIE } from "@/lib/auth/roles";
-import { isMockMode } from "@/lib/env";
-import {
-  MOCK_ADMIN_ID,
-  MOCK_ADMIN_NAME,
-  MOCK_ENTHUSIAST_ID,
-  MOCK_ENTHUSIAST_NAME,
-} from "@/lib/mock/fixtures";
-import { store } from "@/lib/mock/store";
-// import { createClient } from "@/lib/supabase/server";  // step 2
+import { createClient } from "@/lib/supabase/server";
 import type { CurrentUser } from "@/lib/types";
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  if (isMockMode) return mockUser();
+  const supabase = await createClient();
 
-  // ── step 2 ───────────────────────────────────────────────────────────────
-  // const supabase = await createClient();
-  // const { data: { user } } = await supabase.auth.getUser();
-  // if (!user) return null;
-  //
-  // const { data: profile, error } = await supabase
-  //   .from("profiles")
-  //   .select("username, role, leaderboard_opt_in")
-  //   .eq("id", user.id)
-  //   .single();
-  // if (error || !profile) return null;
-  //
-  // return {
-  //   id: user.id,
-  //   displayName: profile.username,
-  //   role: profile.role,
-  //   leaderboardOptIn: profile.leaderboard_opt_in,
-  // };
-  throw new Error(
-    "Real Supabase sessions are not wired up yet. Leave USE_MOCK_DATA=true until step 2.",
-  );
-}
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
-async function mockUser(): Promise<CurrentUser | null> {
-  const jar = await cookies();
-  const role = jar.get(ROLE_COOKIE)?.value ?? "visitor";
-  if (role !== "enthusiast" && role !== "admin") return null;
+  // RLS scopes this to the caller's own row; the eq() is belt and braces, and
+  // documents that no read here is ever unscoped.
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("username, role, leaderboard_opt_in")
+    .eq("id", user.id)
+    .single();
 
-  const id = role === "admin" ? MOCK_ADMIN_ID : MOCK_ENTHUSIAST_ID;
-  const profile = store().profiles[id];
+  // A signed-in user with no profile row should be impossible — the
+  // on_auth_user_created trigger creates it — so treat it as signed out rather
+  // than inventing a default.
+  if (error || !profile) return null;
 
   return {
-    id,
-    displayName:
-      profile?.displayName ??
-      (role === "admin" ? MOCK_ADMIN_NAME : MOCK_ENTHUSIAST_NAME),
-    role,
-    leaderboardOptIn: profile?.leaderboardOptIn ?? false,
+    id: user.id,
+    displayName: profile.username,
+    role: profile.role,
+    leaderboardOptIn: profile.leaderboard_opt_in,
   };
 }
 
 /**
  * Layout and action guards.
  *
- * These redirect, which is a convenience for the person browsing — not a
- * security control. The control is RLS: an admin gets no policy on `ride` at
- * all, so even a hand-crafted request returns nothing. Until step 2 writes
- * those policies, these guards are all there is, and they are not enough.
+ * These redirect, which is a convenience for the person browsing — not the
+ * security control. The control is RLS: an admin has no policy on `ride` at
+ * all, so even a hand-crafted request returns nothing. See
+ * supabase/tests/ride_rls.test.sql and tests/rls/.
  */
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();

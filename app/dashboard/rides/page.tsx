@@ -26,8 +26,7 @@ export default async function RidesPage() {
 
       <p className="text-muted cc-note">
         Only you can see this page. You can edit or delete your own rides and nobody
-        else&apos;s — which will be enforced in the database, not just here, once the
-        policies land.
+        else&apos;s — enforced in the database, not just here.
       </p>
     </div>
   );

@@ -12,9 +12,17 @@ export default defineConfig({
     },
   },
   test: {
-    // Unit tests only for now. tests/rls/ and tests/integration/ arrive with the
-    // database in step 2 (see .claude/skills/e2e-tester), and Playwright owns e2e/.
-    include: ["tests/unit/**/*.test.ts"],
+    // Unit tests are pure. The RLS suite needs the local stack running
+    // (pnpm exec supabase start && pnpm exec supabase db reset) and refuses to
+    // point anywhere but loopback — see tests/support/clients.ts.
+    // Playwright owns e2e/ and is not run by vitest.
+    include: ["tests/unit/**/*.test.ts", "tests/rls/**/*.test.ts"],
     environment: "node",
+    // Real HTTP against a local Postgres; the default 5s is tight for the first
+    // sign-in while the stack warms up.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
+    // The RLS specs mutate shared rows, so they must not interleave.
+    fileParallelism: false,
   },
 });

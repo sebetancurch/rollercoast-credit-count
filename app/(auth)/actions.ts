@@ -1,40 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { HOME_FOR_ROLE, isMockRole, ROLE_COOKIE, type MockRole } from "@/lib/auth/roles";
-import { isMockMode } from "@/lib/env";
-import { MOCK_ENTHUSIAST_ID } from "@/lib/mock/fixtures";
-import { setRideHistory, store } from "@/lib/mock/store";
+import { createClient } from "@/lib/supabase/server";
 import { fieldErrors, signInSchema, signUpSchema } from "@/lib/validation";
 
 /**
  * Authentication.
  *
  * A server action is a public HTTP endpoint, so every payload is parsed before
- * it is used and nothing here ever accepts an argument saying who is acting.
+ * it is used and nothing here accepts an argument saying who is acting.
  *
- * The mock branch sets a cookie. In step 2 the bodies become
- * supabase.auth.signInWithPassword / signUp and the profile insert — the forms,
- * the validation, the error copy and the redirects all stay as they are.
+ * The role is conspicuously absent from the signup path. It is set by the
+ * on_auth_user_created trigger, which hardcodes 'enthusiast' and ignores the
+ * user metadata entirely — a signup payload is client-controlled, so honouring
+ * a role from it would hand out admin on request.
  */
 
 export type AuthState = { errors: Record<string, string> } | null;
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: "lax",
-  path: "/",
-  maxAge: 60 * 60 * 24 * 7,
-} as const;
-
-function assertMock() {
-  if (!isMockMode) {
-    throw new Error("Supabase Auth is not wired up yet. Leave USE_MOCK_DATA=true until step 2.");
-  }
-}
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = signInSchema.safeParse({
@@ -43,12 +27,15 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  assertMock();
-  // Step 2: const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  //         if (error) return { errors: { _: "Email or password not recognised." } };
-  const jar = await cookies();
-  jar.set(ROLE_COOKIE, "enthusiast", COOKIE_OPTIONS);
-  setRideHistory(MOCK_ENTHUSIAST_ID, true);
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  // Deliberately one message for both "no such account" and "wrong password":
+  // distinguishing them tells an attacker which emails are registered.
+  if (error) return { errors: { _: "Email or password not recognised." } };
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
@@ -62,50 +49,36 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  assertMock();
-  // Step 2: supabase.auth.signUp, then insert the profile row with
-  //         leaderboard_opt_in defaulting to false — private by default.
-  const jar = await cookies();
-  jar.set(ROLE_COOKIE, "enthusiast", COOKIE_OPTIONS);
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signUp({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    options: {
+      // Read by the trigger to name the profile. Only the display name — the
+      // trigger ignores anything else that arrives here.
+      data: { display_name: parsed.data.displayName },
+    },
+  });
 
-  const s = store();
-  const profile = s.profiles[MOCK_ENTHUSIAST_ID];
-  if (profile) {
-    profile.displayName = parsed.data.displayName;
-    profile.leaderboardOptIn = false;
+  if (error) {
+    return {
+      errors: {
+        _:
+          error.message.toLowerCase().includes("already")
+            ? "That email already has an account. Try signing in."
+            : "Could not create that account.",
+      },
+    };
   }
-  // A new account has no history.
-  setRideHistory(MOCK_ENTHUSIAST_ID, false);
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
 export async function signOut() {
-  const jar = await cookies();
-  // Step 2: await supabase.auth.signOut();
-  jar.delete(ROLE_COOKIE);
+  const supabase = await createClient();
+  await supabase.auth.signOut();
 
   revalidatePath("/", "layout");
   redirect("/");
-}
-
-/* ── Mock-only, deleted in step 2 ───────────────────────────────────────── */
-
-export async function setMockRole(role: MockRole) {
-  assertMock();
-  if (!isMockRole(role)) return;
-
-  const jar = await cookies();
-  if (role === "visitor") jar.delete(ROLE_COOKIE);
-  else jar.set(ROLE_COOKIE, role, COOKIE_OPTIONS);
-
-  revalidatePath("/", "layout");
-  redirect(HOME_FOR_ROLE[role]);
-}
-
-export async function setMockRideHistory(seeded: boolean) {
-  assertMock();
-  setRideHistory(MOCK_ENTHUSIAST_ID, seeded);
-  revalidatePath("/", "layout");
 }

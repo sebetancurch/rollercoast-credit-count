@@ -27,9 +27,8 @@ export default async function CataloguePage() {
       <CatalogueView coasters={coasters} countries={summary.countries} />
 
       <p className="text-muted cc-note">
-        Only admins can change the catalogue, and admins cannot see any user&apos;s ride
-        history. Both will be enforced at the database layer once the policies land in the
-        next step.
+        Only admins can change the catalogue, enforced at the database layer. Admins
+        cannot see any user&apos;s ride history.
       </p>
     </div>
   );

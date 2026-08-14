@@ -27,3 +27,13 @@ Privacy is the most critical requirement of this application. You must enforce t
 - **Context Management:** Keep file modifications small and modular to manage token usage effectively. If a feature is complex, break it down into sub-tasks rather than executing massive, multi-file rewrites in a single step.
 - **Test-Driven Iteration:** Write the tests/verification steps for the database schema or API endpoints before implementing the Next.js UI components.
 - **No Hallucinations:** If a package or tool is not strictly necessary to fulfill the `docs/` requirements, do not install it.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
