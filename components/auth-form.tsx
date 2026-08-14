@@ -24,7 +24,14 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
+export function AuthForm({
+  mode,
+  notice,
+}: {
+  mode: "signin" | "signup";
+  /** A message carried in from the auth callback, e.g. an expired link. */
+  notice?: string;
+}) {
   const isSignUp = mode === "signup";
   const [state, formAction] = useActionState<AuthState, FormData>(
     isSignUp ? signUp : signIn,
@@ -134,9 +141,9 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
             </div>
           </div>
 
-          {errors._ ? (
+          {errors._ || notice ? (
             <div className="cc-field-error" role="alert">
-              {errors._}
+              {errors._ ?? notice}
             </div>
           ) : null}
 

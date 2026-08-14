@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +78,14 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
       // Read by the trigger to name the profile. Only the display name — the
       // trigger ignores anything else that arrives here.
       data: { display_name: parsed.data.displayName },
+      // Send the confirmation link back to whichever origin the signup came
+      // from. Without this Supabase falls back to the project's single Site URL,
+      // so whichever environment is not configured there gets a link pointing at
+      // the other one — a localhost link in production, or the reverse.
+      //
+      // Every origin used here must be on the project's Redirect URLs
+      // allow-list, or Supabase refuses the link rather than following it.
+      ...(await emailRedirect()),
     },
   });
 
@@ -101,6 +110,25 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+/**
+ * The origin this request arrived on, so the confirmation link comes back to
+ * the same environment. Returns nothing when the origin cannot be determined,
+ * in which case Supabase falls back to the project's Site URL.
+ */
+async function emailRedirect(): Promise<{ emailRedirectTo?: string }> {
+  const h = await headers();
+  const origin =
+    h.get("origin") ??
+    (() => {
+      const host = h.get("x-forwarded-host") ?? h.get("host");
+      if (!host) return null;
+      const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+      return `${proto}://${host}`;
+    })();
+
+  return origin ? { emailRedirectTo: `${origin}/auth/callback` } : {};
 }
 
 /**

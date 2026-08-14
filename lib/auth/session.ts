@@ -33,10 +33,23 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     .eq("id", user.id)
     .single();
 
-  // A signed-in user with no profile row should be impossible — the
-  // on_auth_user_created trigger creates it — so treat it as signed out rather
-  // than inventing a default.
-  if (error || !profile) return null;
+  // A signed-in user with no profile row should be impossible: the
+  // on_auth_user_created trigger creates it, and nothing in the app deletes it.
+  // Treat it as signed out rather than inventing a default — but say so,
+  // loudly. Silently degrading to "visitor" makes a real account look like it
+  // simply refuses to log in, with nothing anywhere explaining why.
+  //
+  // The trigger only fires on INSERT into auth.users, so a profile deleted by
+  // hand cannot be recreated by signing up again: that address is already
+  // registered, so the signup is a no-op. It has to be restored in SQL.
+  if (error || !profile) {
+    console.error(
+      `[auth] user ${user.id} has no profiles row; treating as signed out. ` +
+        `Restore it in SQL — signing up again will not recreate it.`,
+      error,
+    );
+    return null;
+  }
 
   return {
     id: user.id,
