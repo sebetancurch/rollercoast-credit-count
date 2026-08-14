@@ -32,6 +32,31 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
   );
   const errors = state?.errors ?? {};
 
+  // Signup succeeded but the project requires email confirmation, so there is
+  // no session to redirect with. Say so rather than bouncing to a login page
+  // that looks like the signup failed.
+  if (state?.checkEmail) {
+    return (
+      <div className="cc-split cc-split--auth">
+        <div className="cc-empty" style={{ marginTop: 0 }}>
+          <h1 style={{ fontSize: 38, marginBottom: "var(--space-4)" }}>
+            Check your email
+          </h1>
+          <p className="cc-prose cc-prose--lg">
+            Your account is created. We sent a confirmation link to{" "}
+            <strong>{state.checkEmail}</strong> — follow it and you can sign in.
+          </p>
+          <p className="text-muted" style={{ fontSize: 13 }}>
+            Nothing is logged against your account until you do.
+          </p>
+          <Link href="/login" className="btn btn-secondary">
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cc-split cc-split--auth">
       <div>

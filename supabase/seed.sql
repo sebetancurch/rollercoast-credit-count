@@ -142,12 +142,11 @@ insert into coaster_seed (ord, slug, name, park, country, manufacturer, type) va
   (46, 'leviathan', 'Leviathan', 'Canada''s Wonderland', 'Canada', 'Bolliger & Mabillard', 'Steel'),
   (47, 'yukonstriker', 'Yukon Striker', 'Canada''s Wonderland', 'Canada', 'Bolliger & Mabillard', 'Steel');
 
-insert into public.coasters (id, name, park, country, manufacturer, type)
-select
-  ('c0a57e00-0000-4000-8000-' || lpad(ord::text, 12, '0'))::uuid,
-  name, park, country, manufacturer, type::public.coaster_type
-from coaster_seed
-order by ord;
+-- The coaster rows themselves are NOT inserted here. They are reference data
+-- that every environment needs, so they live in the migration
+-- 20260814150000_seed_coaster_catalogue.sql and are already present by the time
+-- this file runs. The temp table above survives only as the slug-to-ordinal
+-- map the ride block below joins through.
 
 -- ── Cass's ride history ────────────────────────────────────────────────────
 -- 62 rides over 2023-2026 touching 36 coasters. Nemesis appears seven times;

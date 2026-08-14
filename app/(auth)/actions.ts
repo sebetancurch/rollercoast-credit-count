@@ -18,7 +18,11 @@ import { fieldErrors, signInSchema, signUpSchema } from "@/lib/validation";
  * a role from it would hand out admin on request.
  */
 
-export type AuthState = { errors: Record<string, string> } | null;
+export type AuthState = {
+  errors?: Record<string, string>;
+  /** Set when signup succeeded but the project requires email confirmation. */
+  checkEmail?: string;
+} | null;
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = signInSchema.safeParse({
@@ -33,9 +37,25 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
     password: parsed.data.password,
   });
 
-  // Deliberately one message for both "no such account" and "wrong password":
-  // distinguishing them tells an attacker which emails are registered.
-  if (error) return { errors: { _: "Email or password not recognised." } };
+  if (error) {
+    // An unconfirmed account is called out separately. Collapsing it into the
+    // generic message tells someone their password is wrong when it is not, and
+    // leaves them with no way forward. It leaks nothing either: whoever created
+    // the account already knows it exists.
+    if (isUnconfirmed(error)) {
+      return {
+        errors: {
+          _:
+            "That account still needs confirming. Check your inbox for the " +
+            "confirmation link, then sign in.",
+        },
+      };
+    }
+
+    // Everything else gets one message. Distinguishing "no such account" from
+    // "wrong password" tells an attacker which emails are registered.
+    return { errors: { _: "Email or password not recognised." } };
+  }
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
@@ -50,7 +70,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -71,8 +91,27 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     };
   }
 
+  // With email confirmation enabled — the default on a hosted project — signUp
+  // returns no session: the account exists and the profile trigger has run, but
+  // nothing is signed in until the link is followed. Redirecting to /dashboard
+  // here would bounce straight back to /login with no explanation.
+  if (!data.session) {
+    return { checkEmail: parsed.data.email };
+  }
+
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+/**
+ * GoTrue reports an unconfirmed account as `email_not_confirmed`. Older
+ * versions only set the message, so both are checked.
+ */
+function isUnconfirmed(error: { code?: string; message: string }): boolean {
+  return (
+    error.code === "email_not_confirmed" ||
+    error.message.toLowerCase().includes("not confirmed")
+  );
 }
 
 export async function signOut() {
