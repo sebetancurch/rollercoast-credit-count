@@ -69,8 +69,7 @@ export function ConfirmDialog({
         </button>
         <button
           type="button"
-          className="btn btn-primary"
-          style={{ background: "var(--color-accent-2-600)" }}
+          className="btn btn-destructive"
           onClick={run}
           disabled={pending}
         >

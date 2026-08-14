@@ -156,14 +156,12 @@ export function AuthForm({
       </div>
 
       <div style={{ paddingTop: "var(--space-6)", maxWidth: "44ch" }}>
-        <h6 style={{ color: "var(--color-accent)" }}>Private by default</h6>
-        <p className="cc-prose cc-prose--lg">
+        <p className="cc-eyebrow">Private by default</p>
+        <p className="cc-prose cc-prose--lg" style={{ marginBottom: 30 }}>
           Your ride history — which coasters, which dates, your notes — is visible to you
           and nobody else. Not other enthusiasts, not admins.
         </p>
-        <h6 style={{ color: "var(--color-accent)", marginTop: "var(--space-6)" }}>
-          The leaderboard is a choice
-        </h6>
+        <p className="cc-eyebrow">The leaderboard is a choice</p>
         <p className="cc-prose cc-prose--lg">
           You start off it. One switch on your dashboard puts your display name and credit
           count on the public board, and the same switch takes them off again.

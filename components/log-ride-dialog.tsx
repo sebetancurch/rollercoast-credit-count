@@ -119,7 +119,7 @@ export function LogRideDialog({
                   onClick={() => setPicked(coaster)}
                 >
                   <span>
-                    <span className="cc-num" style={{ fontSize: 15 }}>
+                    <span className="cc-row-title" style={{ fontSize: 17 }}>
                       {coaster.name}
                     </span>
                     <span className="text-muted" style={{ fontSize: 12, display: "block" }}>

@@ -27,135 +27,158 @@ export default async function DashboardPage() {
 
   return (
     <div className="cc-page">
-      <div className="cc-headline-row">
-        <div>
-          <h6 style={{ color: "var(--color-accent)", marginBottom: "var(--space-3)" }}>
-            Credits
-          </h6>
+      {/* Three tiles joined at a 2px seam: the credit count carries the ink. */}
+      <div className="cc-tiles">
+        <div className="cc-tile cc-tile--feature">
+          <p className="cc-eyebrow cc-eyebrow--on-dark">Credits</p>
           <div className="cc-headline-number">{stats.credits}</div>
-          <p className="text-muted" style={{ marginTop: "var(--space-4)", fontSize: 14 }}>
-            Unique coasters ridden at least once
+          <p className="cc-tile-note">Unique coasters ridden at least once</p>
+        </div>
+
+        <div className="cc-tile">
+          <p className="cc-eyebrow cc-eyebrow--muted">Total rides</p>
+          <div className="cc-stat-number">{stats.totalRides}</div>
+          <p className="cc-tile-note">
+            {stats.repeatCoasters > 0
+              ? `${stats.repeatCoasters} coasters ridden more than once`
+              : "No repeat rides yet"}
           </p>
         </div>
 
-        <div className="cc-stat-group">
-          <div>
-            <h6 className="cc-stat-label">Total rides</h6>
-            <div className="cc-stat-number">{stats.totalRides}</div>
-            <p className="text-muted" style={{ fontSize: 13, marginTop: "var(--space-2)" }}>
-              {stats.repeatCoasters > 0
-                ? `${stats.repeatCoasters} coasters ridden more than once`
-                : "No repeat rides yet"}
-            </p>
+        <div className="cc-tile">
+          <p className="cc-eyebrow cc-eyebrow--muted">Most ridden</p>
+          <div className="cc-stat-number cc-stat-number--sm">
+            {stats.mostRidden?.coaster.name ?? "—"}
           </div>
-
-          <div>
-            <h6 className="cc-stat-label">Most ridden</h6>
-            <div className="cc-stat-number cc-stat-number--sm">
-              {stats.mostRidden?.coaster.name ?? "—"}
-            </div>
-            <p className="text-muted" style={{ fontSize: 13, marginTop: 6 }}>
-              {stats.mostRidden
-                ? `${plural(stats.mostRidden.rides, "ride")} · ${stats.mostRidden.coaster.park}`
-                : "Log a ride to see this"}
-            </p>
-          </div>
+          <p className="cc-tile-note">
+            {stats.mostRidden
+              ? `${plural(stats.mostRidden.rides, "ride")} · ${stats.mostRidden.coaster.park}`
+              : "Log a ride to see this"}
+          </p>
         </div>
       </div>
 
-      <div style={{ marginTop: "var(--space-8)", maxWidth: 620 }}>
-        <h5 style={{ marginBottom: 6 }}>Make your credit count public?</h5>
-        <p
-          className="text-muted"
-          style={{ fontSize: 13, maxWidth: "52ch", textWrap: "pretty" }}
-        >
-          Off by default. When on, the leaderboard shows your display name and credit
-          count — nothing else. Your rides and notes stay private either way.
-        </p>
+      <div
+        className="card"
+        style={{
+          marginTop: 34,
+          maxWidth: 680,
+          display: "flex",
+          gap: 28,
+          alignItems: "center",
+          flexWrap: "wrap",
+          padding: "24px 28px",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <h4 style={{ fontSize: 22, lineHeight: 1.1, marginBottom: 6 }}>
+            Make your credit count public?
+          </h4>
+          <p
+            style={{
+              fontSize: 13,
+              maxWidth: "52ch",
+              textWrap: "pretty",
+              margin: 0,
+              color: "var(--color-ink-65)",
+            }}
+          >
+            Off by default. When on, the leaderboard shows your display name and credit
+            count — nothing else. Your rides and notes stay private either way.
+          </p>
+        </div>
         <OptInToggle optIn={user.leaderboardOptIn} />
       </div>
 
       {stats.totalRides === 0 ? (
         <div className="cc-empty">
           <h3>Nothing logged yet</h3>
-          <p className="cc-prose cc-prose--lg">
+          <p className="cc-prose cc-prose--lg" style={{ marginBottom: 22 }}>
             Search the shared catalogue, pick a coaster, add the date you rode it. That
             first entry becomes credit number one, and your stats appear here — by
             country, by manufacturer, by type.
           </p>
-          <Link href="/dashboard?log=1" className="btn btn-primary">
+          <Link href="/dashboard?log=1" className="btn btn-primary btn-lg">
             Log your first ride
           </Link>
         </div>
       ) : (
         <>
           <div className="cc-breakdowns">
-            <section>
-              <h6 style={{ color: "var(--color-accent)" }}>Credits by country</h6>
+            <section className="cc-panel">
+              <p className="cc-eyebrow">Credits by country</p>
               <CreditMap counts={stats.countryCounts} />
               <CountryLegend rows={stats.byCountry} />
             </section>
 
-            <section>
-              <h6 style={{ color: "var(--color-accent)" }}>Credits by manufacturer</h6>
+            <section className="cc-panel">
+              <p className="cc-eyebrow">Credits by manufacturer</p>
               <BreakdownBars rows={stats.byManufacturer} />
             </section>
 
-            <section>
-              <h6 style={{ color: "var(--color-accent)" }}>Credits by type</h6>
+            <section className="cc-panel">
+              <p className="cc-eyebrow">Credits by type</p>
               <BreakdownBars rows={stats.byType} />
               <p
-                className="text-muted"
-                style={{ fontSize: 12, marginTop: "var(--space-4)", textWrap: "pretty" }}
+                style={{
+                  fontSize: 12,
+                  margin: "22px 0 0",
+                  textWrap: "pretty",
+                  color: "var(--color-ink-55)",
+                }}
               >
                 Stats recalculate from your ride history as you log, edit or delete rides.
               </p>
             </section>
           </div>
 
-          <section style={{ marginTop: "var(--space-8)" }}>
+          <section style={{ marginTop: 34 }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "baseline",
                 justifyContent: "space-between",
-                gap: "var(--space-4)",
+                gap: 20,
+                marginBottom: 12,
               }}
             >
-              <h6 style={{ color: "var(--color-accent)" }}>Latest rides</h6>
-              <Link href="/dashboard/rides" style={{ fontSize: 13 }}>
-                All {plural(stats.totalRides, "ride")}
+              <p className="cc-eyebrow" style={{ margin: 0 }}>
+                Latest rides
+              </p>
+              <Link
+                href="/dashboard/rides"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                All {plural(stats.totalRides, "ride")} →
               </Link>
             </div>
 
             <div className="cc-scroll-x">
               <table className="table">
-                <caption className="text-muted" style={{ captionSide: "bottom", textAlign: "left", fontSize: 12, paddingTop: 10 }}>
+                <caption className="cc-note" style={{ captionSide: "bottom", textAlign: "left" }}>
                   Your five most recent rides. Visible to you and nobody else.
                 </caption>
-                <thead>
-                  <tr>
-                    <th style={{ width: 120 }}>Date</th>
-                    <th>Coaster</th>
-                    <th style={{ width: 190 }}>Park</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
                 <tbody>
                   {latest.map((ride) => (
                     <tr key={ride.id}>
-                      <td className="cc-nowrap cc-tabnum">{formatDate(ride.ridden_on)}</td>
+                      <td className="cc-nowrap cc-tabnum" style={{ width: 130 }}>
+                        {formatDate(ride.ridden_on)}
+                      </td>
                       <td>
-                        <Link href={`/dashboard/coasters/${ride.coaster_id}`} className="cc-num">
+                        <Link
+                          href={`/dashboard/coasters/${ride.coaster_id}`}
+                          className="cc-row-title"
+                        >
                           {ride.coaster.name}
                         </Link>
                       </td>
-                      <td className="text-muted" style={{ fontSize: 13 }}>
-                        {ride.coaster.park}
-                      </td>
-                      <td className="text-muted" style={{ fontSize: 13 }}>
-                        {ride.note ?? "—"}
-                      </td>
+                      <td>{ride.coaster.park}</td>
+                      <td>{ride.note ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>

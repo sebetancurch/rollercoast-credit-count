@@ -72,7 +72,10 @@ export function RidesView({ rides }: { rides: RideWithCoaster[] }) {
                 <tr key={ride.id}>
                   <td className="cc-nowrap cc-tabnum">{formatDate(ride.ridden_on)}</td>
                   <td>
-                    <Link href={`/dashboard/coasters/${ride.coaster_id}`} className="cc-num">
+                    <Link
+                      href={`/dashboard/coasters/${ride.coaster_id}`}
+                      className="cc-row-title"
+                    >
                       {ride.coaster.name}
                     </Link>
                   </td>
@@ -103,7 +106,7 @@ export function RidesView({ rides }: { rides: RideWithCoaster[] }) {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-ghost cc-danger"
+                      className="btn btn-danger"
                       onClick={() =>
                         setConfirming({
                           title: "Delete this ride?",

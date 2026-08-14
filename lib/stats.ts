@@ -127,8 +127,8 @@ export function computeDashboardStats(rides: RideWithCoaster[]): DashboardStats 
  * The 4-step accent ramp the design uses for the choropleth and its legend.
  * Kept next to the stats because the bucket boundaries are a statistic.
  */
-export const CHOROPLETH_RAMP = ["#cbeeff", "#99e0ff", "#38a6cf", "#006786"] as const;
-export const CHOROPLETH_EMPTY = "#dedbdb";
+export const CHOROPLETH_RAMP = ["#cdf3fb", "#7fdcf0", "#22a9cc", "#0e5f78"] as const;
+export const CHOROPLETH_EMPTY = "#e4e0d6";
 
 export function choroplethColor(n: number, max: number): string {
   if (!n) return CHOROPLETH_EMPTY;

@@ -62,7 +62,7 @@ export function CoasterRides({ rides }: { rides: RideWithCoaster[] }) {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost cc-danger"
+                    className="btn btn-danger"
                     onClick={() =>
                       setConfirming({
                         title: "Delete this ride?",

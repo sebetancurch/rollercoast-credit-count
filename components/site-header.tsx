@@ -5,7 +5,7 @@ import { NavLink } from "@/components/nav-link";
 import { getCurrentUser } from "@/lib/auth/session";
 
 /**
- * Role-aware navigation.
+ * Role-aware navigation, on the design's dark navy band.
  *
  * A visitor sees the leaderboard and the way in. An enthusiast additionally
  * sees their dashboard and ride history. An admin sees the catalogue — and no
@@ -20,62 +20,67 @@ export async function SiteHeader() {
 
   return (
     <header className="cc-header">
-      <div className="cc-gutter">
-        <nav className="nav cc-nav" aria-label="Main">
-          <Link href="/" className="nav-brand cc-brand">
-            Credit Count
-          </Link>
+      <nav className="nav cc-nav" aria-label="Main">
+        {/* The skewed cyan bar before the wordmark is drawn by .nav-brand::before */}
+        <Link href="/" className="nav-brand">
+          Credit Count
+        </Link>
 
-          <NavLink href="/" label="Leaderboard" />
+        <NavLink href="/" label="Leaderboard" />
 
-          {user?.role === "enthusiast" ? (
-            <>
-              <NavLink href="/dashboard" label="Dashboard" />
-              <NavLink
-                href="/dashboard/rides"
-                label="My rides"
-                section={["/dashboard/rides", "/dashboard/coasters"]}
-              />
-            </>
-          ) : null}
+        {user?.role === "enthusiast" ? (
+          <>
+            <NavLink href="/dashboard" label="Dashboard" />
+            <NavLink
+              href="/dashboard/rides"
+              label="My rides"
+              section={["/dashboard/rides", "/dashboard/coasters"]}
+            />
+          </>
+        ) : null}
 
-          {user?.role === "admin" ? (
-            <NavLink href="/admin/coasters" label="Catalogue" section={["/admin"]} />
-          ) : null}
+        {user?.role === "admin" ? (
+          <NavLink href="/admin/coasters" label="Catalogue" section={["/admin"]} />
+        ) : null}
 
-          {!user ? (
-            <div className="cc-nav-actions cc-nav-actions--tight">
-              <Link href="/login" className="btn btn-secondary">
-                Sign in
+        {!user ? (
+          <div className="cc-nav-actions cc-nav-actions--tight">
+            <Link href="/login" className="btn btn-on-dark">
+              Sign in
+            </Link>
+            <Link href="/signup" className="btn btn-primary">
+              Sign up
+            </Link>
+          </div>
+        ) : (
+          <div className="cc-nav-actions">
+            {user.role === "enthusiast" ? (
+              <Link href="/dashboard?log=1" className="btn btn-primary cc-nowrap">
+                Log a ride
               </Link>
-              <Link href="/signup" className="btn btn-primary">
-                Sign up
-              </Link>
-            </div>
-          ) : (
-            <div className="cc-nav-actions">
-              {user.role === "enthusiast" ? (
-                <Link href="/dashboard?log=1" className="btn btn-primary cc-nowrap">
-                  Log a ride
-                </Link>
-              ) : null}
+            ) : null}
 
-              <div className="cc-identity">
-                <span className="cc-identity-name">{user.displayName}</span>
-                <span className={user.role === "admin" ? "tag tag-accent-2" : "tag tag-neutral"}>
-                  {user.role === "admin" ? "Admin" : "Enthusiast"}
-                </span>
-              </div>
-
-              <form action={signOut}>
-                <button type="submit" className="btn btn-ghost">
-                  Sign out
-                </button>
-              </form>
+            <div className="cc-identity">
+              <span className="cc-identity-name">{user.displayName}</span>
+              <span
+                className={
+                  user.role === "admin"
+                    ? "cc-identity-role cc-identity-role--admin"
+                    : "cc-identity-role"
+                }
+              >
+                {user.role === "admin" ? "Admin" : "Enthusiast"}
+              </span>
             </div>
-          )}
-        </nav>
-      </div>
+
+            <form action={signOut}>
+              <button type="submit" className="btn btn-ghost-on-dark">
+                Sign out
+              </button>
+            </form>
+          </div>
+        )}
+      </nav>
     </header>
   );
 }

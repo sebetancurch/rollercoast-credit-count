@@ -71,8 +71,8 @@ export function CreditMap({ counts }: { counts: Record<string, number> }) {
             key={`${name}-${index}`}
             d={d}
             fill={choroplethColor(n, max)}
-            stroke="var(--color-bg)"
-            strokeWidth={0.6}
+            stroke="var(--color-surface)"
+            strokeWidth={0.7}
             vectorEffect="non-scaling-stroke"
           >
             <title>

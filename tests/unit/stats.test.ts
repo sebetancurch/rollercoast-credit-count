@@ -187,19 +187,21 @@ describe("computeDashboardStats", () => {
 });
 
 describe("choroplethColor", () => {
+  // These values mirror credit-map.js in the design project. If the design's
+  // ramp moves, both move together or the map stops matching its own legend.
   it("returns the empty shade for no credits", () => {
-    expect(choroplethColor(0, 10)).toBe("#dedbdb");
+    expect(choroplethColor(0, 10)).toBe("#e4e0d6");
   });
 
   it("buckets into four steps of the accent ramp", () => {
-    expect(choroplethColor(1, 8)).toBe("#cbeeff");
-    expect(choroplethColor(4, 8)).toBe("#99e0ff");
-    expect(choroplethColor(6, 8)).toBe("#38a6cf");
-    expect(choroplethColor(8, 8)).toBe("#006786");
+    expect(choroplethColor(1, 8)).toBe("#cdf3fb");
+    expect(choroplethColor(4, 8)).toBe("#7fdcf0");
+    expect(choroplethColor(6, 8)).toBe("#22a9cc");
+    expect(choroplethColor(8, 8)).toBe("#0e5f78");
   });
 
   it("uses the darkest step when the maximum is one", () => {
-    expect(choroplethColor(1, 1)).toBe("#006786");
+    expect(choroplethColor(1, 1)).toBe("#0e5f78");
   });
 });
 

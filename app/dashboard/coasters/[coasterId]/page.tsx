@@ -69,7 +69,7 @@ export default async function CoasterPage({ params }: Params) {
 
       <div className="cc-split cc-split--coaster">
         <div>
-          <h6 style={{ color: "var(--color-accent)" }}>Your rides here</h6>
+          <p className="cc-eyebrow">Your rides here</p>
           <div
             style={{
               display: "flex",
@@ -96,7 +96,7 @@ export default async function CoasterPage({ params }: Params) {
         </div>
 
         <aside>
-          <h6 style={{ color: "var(--color-accent)" }}>Across the community</h6>
+          <p className="cc-eyebrow">Across the community</p>
           <p className="cc-prose">
             <span className="cc-num">{community.members}</span> members have logged this
             coaster, <span className="cc-num">{community.rides}</span>{" "}

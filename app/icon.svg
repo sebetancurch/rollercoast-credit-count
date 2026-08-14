@@ -2,12 +2,13 @@
   <!--
     A coaster in one stroke: lift hill, drop, loop, run-out.
 
-    Broadsheet tokens, hard-coded because an SVG asset cannot read the CSS
-    variables — paper #f3f2f2, accent cyan #0088b0. Kept to one heavy stroke
-    with no fine detail, because this is read at 16px far more often than at 32.
+    Navy ground with an electric-cyan track, matching the redesign. Colours are
+    hard-coded because an SVG asset cannot read the CSS variables. One heavy
+    stroke and no fine detail, because this is read at 16px far more often
+    than at 32.
   -->
-  <rect width="32" height="32" rx="2" fill="#f3f2f2" />
-  <g fill="none" stroke="#0088b0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="32" height="32" rx="3" fill="#0b1533" />
+  <g fill="none" stroke="#00e5ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <!-- lift and drop -->
     <path d="M4 25 L4 9 L11 9" />
     <!-- the loop -->

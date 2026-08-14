@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Source_Serif_4 } from "next/font/google";
+import { Anton, Archivo } from "next/font/google";
 
 import { SiteHeader } from "@/components/site-header";
 import { ToastProvider } from "@/components/toast";
@@ -7,15 +7,22 @@ import { ToastProvider } from "@/components/toast";
 import "./globals.css";
 
 /**
- * The design system loads Source Serif 4 with an @import of Google Fonts.
- * next/font self-hosts it instead: no render-blocking request, no layout shift,
- * and no third-party call from the user's browser. The variable it publishes is
- * what --font-heading and --font-body point at in globals.css.
+ * The design links these from fonts.googleapis.com. next/font self-hosts them
+ * instead: no render-blocking third-party request, no layout shift, and nothing
+ * leaves the user's browser to Google. The variables published here are what
+ * --font-heading and --font-body resolve to in globals.css.
  */
-const sourceSerif = Source_Serif_4({
+const anton = Anton({
   subsets: ["latin"],
-  weight: ["400", "600"],
-  variable: "--font-source-serif",
+  weight: ["400"], // Anton ships a single weight
+  variable: "--font-display",
+  display: "swap",
+});
+
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body-sans",
   display: "swap",
 });
 
@@ -28,7 +35,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={sourceSerif.variable}>
+    <html lang="en" className={`${anton.variable} ${archivo.variable}`}>
       <body>
         <ToastProvider>
           <div className="cc-shell">

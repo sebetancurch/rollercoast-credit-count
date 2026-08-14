@@ -107,7 +107,7 @@ export function CatalogueView({
             {rows.map((coaster) => (
               <tr key={coaster.id}>
                 <td>
-                  <span className="cc-num">{coaster.name}</span>
+                  <span className="cc-row-title">{coaster.name}</span>
                   {dupes.has(coaster.id) ? (
                     <span className="tag tag-accent-2" style={{ marginLeft: 8 }}>
                       Possible duplicate
@@ -135,7 +135,7 @@ export function CatalogueView({
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost cc-danger"
+                    className="btn btn-danger"
                     onClick={() =>
                       setConfirming({
                         title: `Remove ${coaster.name}?`,
