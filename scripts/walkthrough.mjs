@@ -63,8 +63,13 @@ const rowan = await cookieFor("rowan@example.com");
 
 console.log("=== visitor ===");
 const home = await get("/");
-check("leaderboard renders the six opted-in members", home.body.includes("woodie_wendy"));
+check("leaderboard renders the opted-in members", home.body.includes("woodie_wendy"));
 check("ranked by credits", /1 woodie_wendy 30/.test(home.body), home.body.match(/1 \w+ \d+/)?.[0]);
+// 16 members are on the board and the page asks for 15, so the smallest count
+// is cut. Mei-Ling Chou has 5 credits and is the one that falls off.
+check("board is capped at 15 rows", /15 launch_liam 7/.test(home.body), home.body.match(/15 [\w-]+ \d+/)?.[0] ?? "no 15th row");
+check("the 16th member is cut", !home.body.includes("Mei-Ling Chou"));
+check("an opted-in member with no rides is absent", !home.body.includes("brand_new_bea"));
 check("Cass is absent while opted out", !home.body.includes("Cass Ferreira"));
 check("sign in / sign up offered", home.body.includes("Sign in") && home.body.includes("Sign up"));
 for (const p of ["/dashboard", "/dashboard/rides", "/admin/coasters"]) {

@@ -71,7 +71,7 @@ export function AuthForm({
           {isSignUp ? "Start your credit count" : "Welcome back"}
         </h1>
 
-        <div className="seg" style={{ marginBottom: "var(--space-6)" }}>
+        <div className="seg" style={{ marginBottom: "var(--space-3)" }}>
           <Link
             href="/login"
             className="seg-opt"
@@ -87,6 +87,15 @@ export function AuthForm({
             Sign up
           </Link>
         </div>
+
+        {/* Above the form, not under the submit button. Under the button it
+            shared a slot with the red validation messages, so a note about how
+            sign-in works read as the reason the last attempt had failed. */}
+        <p className="text-muted" style={{ fontSize: 12, marginBottom: "var(--space-6)" }}>
+          {isSignUp
+            ? "An email address, a password and a display name is all it takes."
+            : "Sign in with the email address and password you signed up with."}
+        </p>
 
         <form action={formAction} className="cc-stack" noValidate>
           {isSignUp ? (
@@ -148,10 +157,6 @@ export function AuthForm({
           ) : null}
 
           <Submit label={isSignUp ? "Create account" : "Sign in"} />
-
-          <p className="text-muted" style={{ fontSize: 12, marginTop: "var(--space-1)" }}>
-            Email and password only. No third-party sign-in in v1.
-          </p>
         </form>
       </div>
 

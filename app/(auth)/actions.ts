@@ -81,9 +81,18 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     "username_available",
     { p_username: parsed.data.displayName },
   );
+
+  // Fail open. This is a nicety on top of a constraint the database enforces
+  // either way, so when the RPC itself is unreachable — the likeliest cause
+  // being a database that has not had 20260814170000_username_available.sql
+  // applied — the right move is to let the signup through and take the suffix
+  // fallback. Refusing here instead produced a bare "Could not create that
+  // account." with nothing the user could act on, on a form where every field
+  // was valid.
   if (availabilityError) {
-    return { errors: { _: "Could not create that account." } };
+    console.error("username_available failed, continuing signup:", availabilityError);
   }
+
   if (available === false) {
     return {
       errors: { displayName: "That display name is taken. Try another." },

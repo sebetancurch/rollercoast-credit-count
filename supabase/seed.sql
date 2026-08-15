@@ -75,14 +75,47 @@ select pg_temp.seed_user('66666666-6666-4666-8666-666666666666', 'gus@example.co
 select pg_temp.seed_user('77777777-7777-4777-8777-777777777777', 'marcus@example.com',  'credit-count-dev', 'Marcus Odell');
 select pg_temp.seed_user('88888888-8888-4888-8888-888888888888', 'ines@example.com',    'credit-count-dev', 'inversion_ines');
 
+-- More filler, enough that the board overflows the page's limit of 15 and the
+-- truncation is exercised rather than assumed. The `5eed…` id series is these
+-- rows saying out loud that they are seed data; the repeating-digit ids above
+-- ran out of hex characters.
+--
+-- Every credit count here stays under woodie_wendy's 30, so rank 1 does not
+-- move and the walkthrough's assertion on it still means something.
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000001', 'kenji@example.com',   'credit-count-dev', 'Kenji Nakamura');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000002', 'hannah@example.com',  'credit-count-dev', 'hyper_hannah');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000003', 'tomas@example.com',   'credit-count-dev', 'Tomás Iglesias');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000004', 'nadia@example.com',   'credit-count-dev', 'Nadia Okonkwo');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000005', 'ade@example.com',     'credit-count-dev', 'airtime_ade');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000006', 'silke@example.com',   'credit-count-dev', 'Silke Brandt');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000007', 'cai@example.com',     'credit-count-dev', 'coaster_cai');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000008', 'yara@example.com',    'credit-count-dev', 'Yara Haddad');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000009', 'liam@example.com',    'credit-count-dev', 'launch_liam');
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000010', 'meiling@example.com', 'credit-count-dev', 'Mei-Ling Chou');
+
+-- Bea has opted in and has ridden nothing. public_leaderboard joins through
+-- `ride`, so she must not appear — an opted-in member with no rides is the case
+-- that separates "the view filters on opt-in" from "the view lists profiles".
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000011', 'bea@example.com',     'credit-count-dev', 'brand_new_bea');
+
+-- Leon is the second private history. Cass alone proves an enthusiast sees her
+-- own rides; a second substantial history is what a cross-user leak would have
+-- to surface, and it is deliberately shaped differently from hers.
+select pg_temp.seed_user('5eed0000-0000-4000-8000-000000000012', 'leon@example.com',    'credit-count-dev', 'Leon Whitaker');
+
 -- Rowan manages the catalogue and has no ride history. This is the row that
 -- makes "an admin can read nothing in ride" testable against a real session.
 update public.profiles set role = 'admin' where id = '33333333-3333-4333-8333-333333333333';
 
--- Cass is opted OUT: the dashboard's default state, and what puts the "You are
--- not listed" nudge on the leaderboard. Everyone else is opted in.
+-- Cass and Leon are opted OUT: the dashboard's default state, and what puts the
+-- "You are not listed" nudge on the leaderboard. Everyone else is opted in,
+-- Bea included — she is kept off the board by having no rides, not by her
+-- switch, which is the point of her.
 update public.profiles set leaderboard_opt_in = true
-where id <> '11111111-1111-4111-8111-111111111111'
+where id not in (
+    '11111111-1111-4111-8111-111111111111',
+    '5eed0000-0000-4000-8000-000000000012'
+  )
   and role = 'enthusiast';
 
 -- ── catalogue ──────────────────────────────────────────────────────────────
@@ -240,13 +273,41 @@ select
   null
 from (values
   ('44444444-4444-4444-8444-444444444444'::uuid, 30),
+  ('5eed0000-0000-4000-8000-000000000001'::uuid, 28),
+  ('5eed0000-0000-4000-8000-000000000002'::uuid, 27),
+  ('5eed0000-0000-4000-8000-000000000003'::uuid, 26),
   ('55555555-5555-4555-8555-555555555555'::uuid, 24),
+  ('5eed0000-0000-4000-8000-000000000004'::uuid, 23),
+  ('5eed0000-0000-4000-8000-000000000005'::uuid, 21),
   ('66666666-6666-4666-8666-666666666666'::uuid, 19),
+  ('5eed0000-0000-4000-8000-000000000006'::uuid, 17),
+  ('5eed0000-0000-4000-8000-000000000007'::uuid, 16),
   ('77777777-7777-4777-8777-777777777777'::uuid, 14),
   ('22222222-2222-4222-8222-222222222222'::uuid, 12),
-  ('88888888-8888-4888-8888-888888888888'::uuid,  9)
+  ('5eed0000-0000-4000-8000-000000000008'::uuid, 11),
+  ('88888888-8888-4888-8888-888888888888'::uuid,  9),
+  ('5eed0000-0000-4000-8000-000000000009'::uuid,  7),
+  ('5eed0000-0000-4000-8000-000000000010'::uuid,  5)
 ) as b(user_id, n)
 join coaster_seed cs on cs.ord <= b.n;
+
+-- Brand-new Bea gets no insert at all. That absence is the fixture.
+
+-- ── Leon's ride history ────────────────────────────────────────────────────
+-- Every even-ordinal coaster, twice, a year apart: 46 rides across 23 credits.
+-- Generated rather than listed because what matters about it is the shape —
+-- rides and credits disagree here too, so a bug that returns the wrong user's
+-- rows produces visibly wrong totals rather than a plausible number.
+
+insert into public.ride (user_id, coaster_id, ridden_on, note)
+select
+  '5eed0000-0000-4000-8000-000000000012'::uuid,
+  ('c0a57e00-0000-4000-8000-' || lpad(cs.ord::text, 12, '0'))::uuid,
+  date '2024-04-01' + cs.ord + (visit.n * 365),
+  null
+from coaster_seed cs
+cross join (values (0), (1)) as visit(n)
+where cs.ord % 2 = 0;
 
 -- ── assertions ─────────────────────────────────────────────────────────────
 -- The seed fails loudly rather than quietly producing data the tests then
@@ -259,6 +320,9 @@ declare
   n_credits  int;
   n_dupes    int;
   n_board    int;
+  n_bea      int;
+  n_leon     int;
+  c_leon     int;
 begin
   select count(*) into n_coasters from public.coasters;
   select count(*), count(distinct coaster_id)
@@ -274,15 +338,25 @@ begin
         and lower(o.park) = lower(c.park)
     );
   select count(*) into n_board from public.public_leaderboard;
+  select count(*) into n_bea
+    from public.public_leaderboard where display_name = 'brand_new_bea';
+  select count(*), count(distinct coaster_id)
+    into n_leon, c_leon
+    from public.ride
+    where user_id = '5eed0000-0000-4000-8000-000000000012';
 
   if n_coasters <> 47 then raise exception 'expected 47 coasters, got %', n_coasters; end if;
   if n_rides    <> 62 then raise exception 'expected 62 rides for Cass, got %', n_rides; end if;
   if n_credits  <> 36 then raise exception 'expected 36 credits for Cass, got %', n_credits; end if;
   if n_credits  >= n_rides then raise exception 'credits must stay below rides'; end if;
   if n_dupes    <> 2  then raise exception 'expected the Icon/ICON pair, got % duplicate rows', n_dupes; end if;
-  if n_board    <> 6  then raise exception 'expected 6 opted-in members on the board, got %', n_board; end if;
+  if n_board    <> 16 then raise exception 'expected 16 opted-in members on the board, got %', n_board; end if;
+  if n_board    <= 15 then raise exception 'the board must overflow the page limit of 15'; end if;
+  if n_bea      <> 0  then raise exception 'brand_new_bea has no rides and must not reach the board'; end if;
+  if n_leon     <> 46 then raise exception 'expected 46 rides for Leon, got %', n_leon; end if;
+  if c_leon     <> 23 then raise exception 'expected 23 credits for Leon, got %', c_leon; end if;
 
-  raise notice 'seed ok: % coasters, Cass % rides / % credits, % on the board',
-    n_coasters, n_rides, n_credits, n_board;
+  raise notice 'seed ok: % coasters, Cass % rides / % credits, Leon % / %, % on the board',
+    n_coasters, n_rides, n_credits, n_leon, c_leon, n_board;
 end
 $chk$;

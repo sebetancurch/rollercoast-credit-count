@@ -83,6 +83,11 @@
   --shadow-lg: 0 18px 50px rgba(11, 21, 51, 0.3);
 
   --cc-gutter: 40px;
+  /* A deliberate deviation from the design, which is full-bleed. Past about
+     this width the dashboard tiles and the leaderboard stop reading as a page
+     and start reading as a spreadsheet. One knob: .cc-gutter and .cc-nav both
+     centre on it, so the nav row stays aligned with the content under it. */
+  --cc-max: 1280px;
 }
 
 /* ── 2. Base ───────────────────────────────────────────────────────────── */
@@ -144,13 +149,24 @@ p { margin: 0 0 var(--space-3); }
 
 a { color: var(--color-accent-700); text-underline-offset: 3px; }
 
-/* :not(.btn) is load-bearing and predates this design. Anchor rules are
-   element-plus-pseudo selectors, so they outrank a bare .btn class — without
-   the exclusion a link styled as a filled button has its label repainted to
-   whatever the anchor rule says, which previously made primary buttons lose
-   their text entirely on hover. Several buttons here are <Link>s. */
-a:not(.btn):hover { color: var(--color-text); }
-a:not(.btn):active { color: var(--color-accent-mid); }
+/* These two are the fallback for prose links and must lose to every component
+   that states its own hover colour. Getting that wrong is this stylesheet's
+   recurring bug, and it has now bitten three times.
+
+   The trap: `a:not(.btn):hover` scores 0-2-1, because :not() contributes the
+   specificity of its argument. That beats .nav-brand:hover, .cc-nav-link:hover,
+   .cc-row-title:hover and .seg-opt[aria-current] — all 0-2-0 — and repaints
+   them --color-text, which on the navy nav band IS the background. The labels
+   do not change colour, they disappear.
+
+   :where() contributes zero, so these land at 0-1-1 and every component rule
+   outranks them. The .btn exclusion is now redundant (.btn-*:hover is 0-2-0)
+   and stays only to say out loud that several buttons here are <Link>s.
+
+   Rule of thumb: colour belongs on the component, never on a broad descendant
+   or element selector. */
+a:where(:not(.btn)):hover { color: var(--color-text); }
+a:where(:not(.btn)):active { color: var(--color-accent-mid); }
 
 img { display: block; max-width: 100%; }
 figure { margin: 0; }
@@ -351,6 +367,9 @@ select.input { min-height: 46px; }
 .tag-outline { border: 2px solid var(--color-accent-700); color: var(--color-accent-700); }
 
 /* — navigation — the header is a dark navy band — */
+/* No background here on purpose: .nav is the constrained row, .cc-header is the
+   full-bleed band behind it. Painting the navy on this element would stop it at
+   --cc-max and leave cream down both edges of the header. */
 .nav {
   display: flex;
   align-items: center;
@@ -358,7 +377,6 @@ select.input { min-height: 46px; }
   gap: 0 22px;
   min-height: 72px;
   align-content: stretch;
-  background: var(--color-text);
   color: #ffffff;
 }
 .nav-brand {
@@ -512,9 +530,29 @@ select.input { min-height: 46px; }
 }
 
 .cc-shell { min-height: 100vh; padding-bottom: 120px; }
-.cc-gutter { width: 100%; padding: 0 var(--cc-gutter); }
-.cc-header { position: sticky; top: 0; z-index: 30; }
-.cc-nav { padding: 0 var(--cc-gutter); }
+
+/* The container. max-width covers the content box, so the gutters are added on
+   top of --cc-max rather than eaten out of it — the content itself measures
+   --cc-max at any viewport wide enough. */
+.cc-gutter {
+  width: 100%;
+  max-width: calc(var(--cc-max) + 2 * var(--cc-gutter));
+  margin-inline: auto;
+  padding: 0 var(--cc-gutter);
+}
+
+/* Full-bleed navy band; .cc-nav inside it is centred on the same container. */
+.cc-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--color-text);
+}
+.cc-nav {
+  max-width: calc(var(--cc-max) + 2 * var(--cc-gutter));
+  margin-inline: auto;
+  padding: 0 var(--cc-gutter);
+}
 .cc-nav-actions {
   display: flex;
   align-items: center;

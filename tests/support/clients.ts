@@ -71,6 +71,18 @@ export const users = {
     email: "rowan@example.com",
     username: "Rowan Selby",
   },
+  /** 46 rides across 23 coasters. Opted OUT — the second private history. */
+  leon: {
+    id: "5eed0000-0000-4000-8000-000000000012",
+    email: "leon@example.com",
+    username: "Leon Whitaker",
+  },
+  /** Opted IN with no rides at all. Must still not reach the board. */
+  bea: {
+    id: "5eed0000-0000-4000-8000-000000000011",
+    email: "bea@example.com",
+    username: "brand_new_bea",
+  },
 } as const;
 
 export const seeded = {
@@ -78,9 +90,13 @@ export const seeded = {
   cassRides: 62,
   cassCredits: 36,
   priyaRides: 12,
-  boardMembers: 6,
+  leonRides: 46,
+  leonCredits: 23,
+  /** Deliberately more than the 15 the leaderboard page asks for. */
+  boardMembers: 16,
 } as const;
 
 export const asCass = () => signedInAs(users.cass.email, PASSWORD);
 export const asPriya = () => signedInAs(users.priya.email, PASSWORD);
 export const asRowan = () => signedInAs(users.rowan.email, PASSWORD);
+export const asLeon = () => signedInAs(users.leon.email, PASSWORD);

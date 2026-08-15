@@ -2,7 +2,7 @@
 -- does and does not publish.
 
 begin;
-select plan(19);
+select plan(20);
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
@@ -61,8 +61,8 @@ set local role anon;
 
 select is(
   (select count(*)::int from public.public_leaderboard),
-  6,
-  'a signed-out visitor reads the board: the six opted-in members'
+  16,
+  'a signed-out visitor reads the board: every opted-in member with rides'
 );
 
 -- Cass is opted out in the seed. Her 36 credits stay private.
@@ -71,6 +71,15 @@ select is(
    where display_name = 'Cass Ferreira'),
   0,
   'an opted-out member does not appear, however many credits they have'
+);
+
+-- Bea is opted IN and has ridden nothing. The view joins through `ride`, so
+-- opting in is necessary and not sufficient — this is the row that says so.
+select is(
+  (select count(*)::int from public.public_leaderboard
+   where display_name = 'brand_new_bea'),
+  0,
+  'and an opted-in member with no rides does not appear either'
 );
 
 -- The assertion that catches a future `select *` quietly publishing a column.
@@ -111,7 +120,7 @@ select lives_ok(
 -- Opting in is the whole mechanism: nothing else changed, and the board grew.
 select is(
   (select count(*)::int from public.public_leaderboard),
-  7,
+  17,
   'and that single switch is what puts them on the board'
 );
 

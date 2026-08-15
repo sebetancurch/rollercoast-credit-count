@@ -1,26 +1,24 @@
 "use client";
 
-export default function GlobalError({
+import { ErrorView } from "@/components/error-view";
+
+/**
+ * The root segment's boundary. Catches anything thrown by a page under `/`
+ * that has no closer error.tsx — the leaderboard, most obviously.
+ *
+ * It does NOT catch a failure in the root layout itself; that is what
+ * app/global-error.tsx is for.
+ */
+export default function RootError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
-    <div className="cc-page" style={{ maxWidth: "52ch" }}>
-      <h1>Something went wrong</h1>
-      <p className="cc-prose cc-prose--lg">
-        That page could not be loaded. Nothing you have logged has been changed.
-      </p>
-      {error.digest ? (
-        <p className="text-muted" style={{ fontSize: 12 }}>
-          Reference {error.digest}
-        </p>
-      ) : null}
-      <button type="button" className="btn btn-primary" onClick={reset}>
-        Try again
-      </button>
-    </div>
+    <ErrorView level="h1" title="Something went wrong" digest={error.digest} onRetry={retry}>
+      That page could not be loaded. Nothing you have logged has been changed.
+    </ErrorView>
   );
 }
