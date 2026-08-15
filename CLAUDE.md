@@ -179,7 +179,11 @@ than reasoning from first principles:
   `auth.users`).
 - **Hosted Supabase has email confirmation ON by default; the local stack has it off.**
   Signup returns no session on hosted, which is why `app/auth/callback/route.ts` exchanges
-  the PKCE code and `signUp` passes `emailRedirectTo`.
+  the PKCE code and `signUp` passes `emailRedirectTo`. **This project's hosted instance
+  has it turned off** (Authentication → Sign In / Providers → Email → Confirm email), so a
+  reviewer can sign up without waiting on mail that the built-in SMTP rate-limits. The
+  callback route and the "check your email" branch in `components/auth-form.tsx` stay
+  regardless: both are correct the moment it is switched back on.
 - `next.config.ts` carries `allowedDevOrigins` for the Hyper-V bridge address. Without it
   Next 16 blocks `/_next/hmr` cross-origin and the page loads but never hydrates. That
   address is what `next dev` prints as **Network** because `getNetworkHost()` takes the

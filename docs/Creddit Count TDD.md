@@ -2,65 +2,21 @@ Sergio Betancur Chaves
 
 # Credit Count — Technical Design Document
 
-Track two numbers that must never be confused — **credits** (distinct coasters ridden) and
-**rides** (times ridden) — with ride history private by default.
+Track two numbers that must never be confused — **credits** (distinct coasters ridden)
+and **rides** (times ridden) — with ride history private by default.
 
-## 1. Agent Instructions
+**Live**: `rollercoast-credit-count.vercel.app` 
+**Source**: `github.com/sebetancurch/rollercoast-credit-count`
+**Stack**: Next.js 16 (App Router) · React 19 · Supabase (Postgres 17, GoTrue, RLS) ·
+`@supabase/ssr` · zod · pnpm · vitest + pgTAP
 
-**Loop:** write the failing test → run it, confirm it fails → implement → run it, confirm it
-passes → `pnpm db:types` if the schema moved → `pnpm typecheck && pnpm lint && pnpm test`.
+## 1. Architecture
 
-```bash
-pnpm dev | build | typecheck | lint          # app
-pnpm test | test:unit | test:rls             # vitest (test:rls needs the local stack)
-pnpm exec supabase start                     # local stack (Docker)
-pnpm db:reset | db:test | db:types           # migrations+seed | pgTAP | regenerate types
-pnpm db:seed:remote                          # seed a HOSTED project via the Admin API
-node scripts/walkthrough.mjs                 # end-to-end, needs a running dev server
-```
-
-| MUST | MUST NOT |
-|---|---|
-| Use `pnpm` | Run `npm` / `npx` |
-| Change schema via a new `supabase/migrations/*.sql` | Write ad-hoc DDL |
-| Run `pnpm db:types` after every migration | Edit `lib/database.types.ts` (generated) |
-| Take `user_id` from the verified session | Trust any `user_id` in a payload |
-| Derive credits at read time | Add a stored `credit_count` column or `credits` table |
-| Leave `public_leaderboard` definer-rights | Add any policy on `ride` for admins |
-| Ask the user about env values | Read or write `.env*`, or install unlisted packages |
-
-## 2. Acceptance Criteria
-
-| # | Criterion |
-|---|---|
-| A1 | An enthusiast MUST read/insert/update/delete only `ride` rows where `auth.uid() = user_id`. |
-| A2 | Selecting another user's rides MUST return `[]` with **no error**. |
-| A3 | An admin selecting `ride` MUST receive `[]` — there is no admin policy on that table. |
-| A4 | An insert attributed to another `user_id` MUST fail with `42501`. |
-| A5 | An update/delete against another user's ride MUST affect zero rows and MUST NOT raise. |
-| A6 | Only an admin MAY write `coasters`; any authenticated user MAY read them. |
-| A7 | An unauthenticated visitor MUST reach `public_leaderboard` and nothing else. |
-| A8 | A user MUST NOT change their own `role`. |
-| B1 | A profile appears on the board only when `leaderboard_opt_in = true`. |
-| B2 | A profile with zero rides MUST NOT appear, opted in or not. |
-| B3 | The view MUST expose exactly `display_name` and `credit_count`. |
-| B4 | The view MUST expose no filterable identifier. |
-| C1 | Credits MUST be `count(distinct coaster_id)`, computed at read time. |
-| C2 | Deleting the only ride of a coaster MUST decrease credits by 1. |
-| D1 | Email and password only. No third-party sign-in. |
-| D2 | Signup with a registered email MUST be a silent no-op — no error, no email. |
-| D3 | Sign-in MUST NOT distinguish "no such account" from "wrong password". |
-| D4 | `role` and `leaderboard_opt_in` MUST come from the trigger, never the signup payload. |
-| D5 | The server MUST call `getUser()`, never `getSession()`. |
-
-## 3. Architecture
-
-**Stack:** Next.js 16 (App Router) · React 19 · Supabase (Postgres, GoTrue, RLS) ·
-`@supabase/ssr` · zod · **pnpm** · vitest + pgTAP.
+Front-end developed in Nextjs using server components and actions to handle the communication directly to the DB in Supabase. Role based access is controlled directly from the DB engine using RLS (Row Level Security) policies.
 
 ```mermaid
 flowchart LR
-    B[Browser] --> P["proxy.ts<br/>session refresh + redirect"]
+    B[Browser] --> P["proxy.ts<br/>session refresh"]
     P --> SC["Server Component<br/>lib/data/*.ts — reads"]
     P --> SA["Server Action<br/>app/*/actions.ts — writes"]
     SC --> R[PostgREST]
@@ -69,230 +25,193 @@ flowchart LR
     RLS --> PG[(Postgres)]
 ```
 
-`proxy.ts` and the `require*` guards redirect people off pages that would only error. They
-are a convenience. A request that skips them still returns nothing, because the policies
-are attached to the tables.
-
 ![[System Design.png]]
 
-### Data model
+Reads are server components querying directly with no API routes, no useEffect. Writes
+are server actions. proxy.ts refreshes the session cookie and redirects. Pages never build a query
+themselves: reads go through `lib/data/*.ts`, writes through `app/*/actions.ts`, the
+session through `lib/auth/session.ts`, and the schema is in `supabase/migrations/`.
 
-![[DB Model.png]]
+## 2. Data model
 
-> Superseded by the diagram below: keys are UUIDs, there is no `email` or `password`
-> column (Auth owns credentials), and the table is `profiles`, not `users`.
+![[DB Schema.png]]
 
-```mermaid
-erDiagram
-    auth_users ||--|| profiles : "on_auth_user_created"
-    auth_users ||--o{ ride : owns
-    coasters   ||--o{ ride : "ridden as"
 
-    auth_users { uuid id PK "Auth owns email + password" }
-    profiles {
-        uuid    id PK_FK "= auth.users.id, cascade"
-        text    username "unique, 1..40"
-        enum    role "enthusiast | admin"
-        boolean leaderboard_opt_in "default false"
-    }
-    coasters {
-        uuid id PK
-        text name
-        text park
-        text country
-        text manufacturer
-        enum type "Steel | Wooden | Hybrid"
-    }
-    ride {
-        uuid id PK
-        uuid user_id FK "auth.users, cascade"
-        uuid coaster_id FK "coasters, RESTRICT"
-        date ridden_on "check: not future"
-        text note "nullable, <= 500"
-    }
-```
+Three models were made, profile, coasters and ride, while the credits and the leaderboard are left as a view, while authentication is handled on the Supabase Auth. Three important choices: `ride.coaster_id` is `on delete restrict`, because a cascade
+would silently rewrite other people's credit counts. There is no unique constraint on `(user_id, coaster_id, ridden_on)` — repeat rides are the whole point.
+`profiles` table has no `email` or `password`since auth owns credentials, and an email.
 
-## 4. Detailed Design
+## 3. Security — RLS is the boundary
 
-```
-app/(auth)|dashboard|admin/actions.ts    server actions — every write
-app/auth/callback/route.ts               PKCE code exchange
-lib/auth/session.ts                      getCurrentUser + require* guards
-lib/data/*.ts                            every read; pages never build a query
-lib/supabase/{client,server,middleware}  three clients, three lifetimes
-lib/stats.ts | lib/validation.ts         credit derivation | zod schemas
-proxy.ts                                 session refresh (Next 16 middleware)
-supabase/migrations/*.sql                what actually shipped
-supabase/tests/*.test.sql | tests/rls/   pgTAP | real JWTs through PostgREST
-```
+The whole user role access is handled by the RLS Policies, nothing in Typescript. The models and view access are summarized in the next subsections.
 
-### `ride` policies — A1–A5
+### 3.1 `ride` — owner only, admins excluded by silence
 
-Four owner policies and **nothing for admins**. Admin blindness is silence, not a rule
-denying them. `(select auth.uid())` rather than a bare call, so it is evaluated once per
-statement instead of once per row.
+Four owner policies and **nothing for admins**, so an admin's select returns `[]`
+however it is issued.
 
 ```sql
-alter table public.ride enable row level security;
-revoke all on public.ride from anon, authenticated;
-grant select, insert, update, delete on public.ride to authenticated;
-
-create policy "ride: owner reads own"
-  on public.ride for select to authenticated
+create policy "ride: owner reads own" on public.ride for select to authenticated
   using ( (select auth.uid()) = user_id );
 
-create policy "ride: owner inserts own"
-  on public.ride for insert to authenticated
+-- UPDATE needs both clauses: `using` filters the rows the statement may see,
+-- `with check` validates the row it writes. Without the second, a user could
+-- move their own ride to somebody else's user_id.
+create policy "ride: owner updates own" on public.ride for update to authenticated
+  using      ( (select auth.uid()) = user_id )
   with check ( (select auth.uid()) = user_id );
-
--- update and delete repeat the same predicate, in `using` and `with check`.
 ```
 
-### The escalation guard — A8
+### 3.2 `coasters` — read for all, write for admins
 
-Not a policy. RLS cannot express "this row but not this column" — `with check` cannot see
-the old value.
+Any authenticated user can read the catalogue, but only an admin can write to it. The
+admin check was extracted into an `is_admin()` function marked as security definer, so
+the policy on `coasters` can look at the `profiles` table without running that table's
+own policies from inside a policy. The `search_path` is pinned so a caller cannot shadow
+`profiles` with a table of their own and answer the question themselves.
 
 ```sql
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.profiles
+                 where id = (select auth.uid()) and role = 'admin');
+$$;
+```
+
+### 3.3 The escalation guard — a column privilege, not a policy
+
+A user can edit their own profile but must not be able to make themselves an admin. RLS
+only decides which *rows* a statement may touch, it cannot restrict a single column,
+because `with check` never sees the old value. This was solved with column privileges
+instead: the update grant covers the display name and the leaderboard switch and nothing
+else.
+
+```sql
+revoke all on public.profiles from anon, authenticated;
+grant select                                on public.profiles to authenticated;
 grant update (username, leaderboard_opt_in) on public.profiles to authenticated;
 ```
 
-### The leaderboard view — B1–B4
+### 3.4 `public_leaderboard` — definer-rights on purpose
 
-Definer-rights **on purpose**: it aggregates behind the RLS boundary, so `anon` gets counts
-without row access to `ride`. Supabase's `security_definer_view` advisor flags this; that
-is expected. PostgREST can filter on any exposed column, so a third column would turn the
-public board into a per-user lookup.
+The leaderboard was left as a view so the credits are always counted at the moment they
+are read. It aggregates behind the RLS boundary, which is what lets a visitor read the
+counts without being given any access to the ride rows underneath. With
+`security_invoker` the view would run as the caller instead, and `anon` would need a
+select policy on `ride` — exactly what has to stay private.
 
 ```sql
 create view public.public_leaderboard as
-select
-  p.username                        as display_name,
-  count(distinct r.coaster_id)::int as credit_count
+select p.username as display_name, count(distinct r.coaster_id)::int as credit_count
 from public.profiles p
-join public.ride r on r.user_id = p.id      -- B2: no rides, no row
-where p.leaderboard_opt_in = true           -- B1
+join public.ride r on r.user_id = p.id      -- no rides, no row
+where p.leaderboard_opt_in = true
 group by p.id, p.username;                  -- by id, so two same names never merge
 
-grant select on public.public_leaderboard to anon, authenticated;
+grant select on public.public_leaderboard to anon, authenticated;  -- a view has no
+                                           -- policies, so the grants ARE the control
 ```
 
-### Profile creation — D4
+The view publishes a display name and a credit count and nothing else. No identifier is
+selected, because PostgREST lets a caller filter on any exposed column and a `user_id`
+there would turn the public board into a per-user lookup. That is why `p.id` is grouped
+on but never selected.
 
-```sql
-create trigger on_auth_user_created
-  after insert on auth.users for each row execute function public.handle_new_user();
-```
+## 4. Auth, writes and derived credits
 
-`handle_new_user()` is `security definer`, reads only `display_name` out of the signup
-metadata, and **hardcodes** `'enthusiast'` and `false`. A signup body is client-controlled;
-honouring a role from it would hand out admin on request.
+Authentication is handled entirely by Supabase Auth, so the app never stores an email or
+a password. A trigger on `auth.users` called `handle_new_user()` creates the matching
+profile row and hardcodes the role as enthusiast and the leaderboard switch as off,
+because the signup payload comes from the client and cannot be trusted with either.
+Sign-in returns one generic message for every failure, except an unconfirmed account,
+which gets its own so the user is not left thinking their password is wrong.
 
-### Session — D5
+Every write was built as a server action. A server action is a public HTTP endpoint, so
+each one reads the session again, validates the payload with zod, and takes the user id
+from that session and never from its arguments.
 
 ```ts
-// lib/auth/session.ts — getSession() trusts a cookie the client can write.
-const { data: { user } } = await supabase.auth.getUser();
-if (!user) return null;
-```
-
-### Writes — A1, D2/D3
-
-A server action is a public HTTP endpoint, so each one re-reads the session, parses the
-payload, and takes `user_id` from the session.
-
-```ts
-// app/dashboard/actions.ts
 export async function logRide(input: unknown): Promise<ActionResult> {
-  const user = await requireEnthusiast();          // 1. re-read the session
+  const user   = await requireEnthusiast();        // 1. re-read the session
   const parsed = logRideSchema.safeParse(input);   // 2. parse the payload
   if (!parsed.success) return { ok: false, error: /* … */ };
 
-  const { error } = await supabase.from("ride").insert({
+  await supabase.from("ride").insert({
     user_id: user.id,                              // 3. never from the arguments
-    coaster_id: parsed.data.coasterId,
-    ridden_on: parsed.data.riddenOn,
-    note: parsed.data.note,
+    coaster_id: parsed.data.coasterId, ridden_on: parsed.data.riddenOn,
   });
-  // …then revalidate /dashboard, /dashboard/rides and / (the board reads this count).
+  revalidateRideViews();   // /dashboard, /dashboard/rides, / — no manual refresh step
 }
 ```
-
-Auth follows the same shape. Sign-in collapses every failure into one message except an
-unconfirmed account (D3); signup with a registered email returns no error and no session,
-so the form shows "check your email" (D2). Display-name availability goes through
-`username_available(text)`, a definer function returning a single boolean — safe only
-because display names are already public, and it must never gain an email equivalent.
-
-### Credits are derived — C1, C2
 
 ```ts
-// lib/stats.ts — pure. Nothing caches, nothing stores.
-export function creditCount(rides: RideWithCoaster[]): number {
-  return ridesPerCoaster(rides).size;   // count(distinct coaster_id)
-}
+await supabase.auth.getUser();   // never getSession(): that is a cookie the client writes
+export const creditCount = (rides) => ridesPerCoaster(rides).size;  // distinct coasters
 ```
+
+Credits are never written down anywhere. There is no `credit_count` column and no
+`credits` table: `lib/stats.ts` derives them for the dashboard and the view derives them
+for the board, so the two numbers cannot fall out of sync. Logging a ride takes three
+interactions — **Log a ride** → pick a coaster → **Save ride** — since the date defaults
+to today and the catalogue is filtered in the browser.
 
 ## 5. Testing
 
-| Layer | Location | Proves |
-|---|---|---|
-| pgTAP | `supabase/tests/*.test.sql` | Policies, grants, constraints, per role |
-| RLS integration | `tests/rls/` | The same rules through real JWTs and PostgREST |
-| Unit | `tests/unit/` | Derivation, validation, seed parity — no database |
-| Walkthrough | `scripts/walkthrough.mjs` | Server components + `proxy.ts` + RLS together |
+Testing was split into four layers, since each one can only prove part of it. The
+database layers are the ones that matter most, because they check the rules where the
+rules actually live.
 
-**How a blocked operation presents** — read this before writing an authorization assertion:
-a blocked **SELECT** returns `[]` with no error; a blocked **INSERT** returns `42501`; a
-blocked **UPDATE/DELETE** affects zero rows and does not raise. So a blocked update is
-tested as `lives_ok` plus a re-read as the owner showing the data is untouched.
+| Layer | Location | Count | Proves |
+|---|---|---|---|
+| pgTAP | `supabase/tests/` | 45 | Policies, grants, constraints, per role |
+| RLS integration | `tests/rls/` | 34 | The same rules through real JWTs and PostgREST |
+| Unit | `tests/unit/` | 49 | Derivation, validation, seed parity — no database |
+| Walkthrough | `scripts/walkthrough.mjs` | 3 roles | Server components + `proxy.ts` + RLS together |
 
-```ts
-// tests/rls/ride.test.ts — A2, A3, A4
-it("returns no rows when one enthusiast selects another's rides", async () => {
-  const { data, error } = await priya.from("ride").select("*").eq("user_id", users.cass.id);
-  expect(error).toBeNull();   // filtered out, not rejected
-  expect(data).toEqual([]);
-});
+The way a blocked operation behaves is what decides how each assertion is written: a
+blocked select comes back as an empty array with no error, a blocked insert returns
+`42501`, and a blocked update or delete affects no rows without raising anything. So a
+blocked update is tested as an attempt that succeeds plus a re-read proving the data
+never changed.
 
-it("returns nothing at all to an admin", async () => {
-  const { data } = await rowan.from("ride").select("*");
-  expect(data).toEqual([]);
-});
-
-it("rejects an insert attributed to another user", async () => {
-  const { error } = await priya.from("ride")
-    .insert({ user_id: users.cass.id, coaster_id, ridden_on: "2026-01-01" });
-  expect(error?.code).toBe("42501");
-});
+```sql
+-- Refused by column privilege before RLS is consulted at all.
+select throws_ok($$update public.profiles set role = 'admin' where id = '…'$$, '42501');
+-- Catches a future `select *` quietly publishing a column.
+select set_eq($$select column_name from information_schema.columns
+                where table_name = 'public_leaderboard'$$, array['display_name','credit_count']);
 ```
 
-```ts
-// tests/rls/leaderboard.test.ts — B3, B4
-expect(Object.keys(data![0]).sort()).toEqual(["credit_count", "display_name"]);
+The seed data is deterministic, and every fixture in it is there for a reason: 62 rides
+across 36 credits so the two numbers disagree, 16 members on the board so the page's
+limit of 15 is actually reached, one member opted in with no rides, and one admin with
+none at all. The 47-coaster catalogue is reference data that every environment needs, so
+it lives in a **migration** rather than in the seed.
 
-// @ts-expect-error "user_id" is not a column on public_leaderboard
-const { error } = await query.eq("user_id", users.cass.id);
-expect(error).toBeTruthy();   // rejected at compile time AND at runtime
-```
+## 6. Deviations, secrets and limits
 
-**Seed.** `supabase/seed.sql` is deterministic and asserts its own shape at reset. Its
-load-bearing fixtures: 62 rides across 36 credits (the two must disagree), 16 board members
-(overflows the page's `limit(15)`), an opted-in member with zero rides (B2), an admin with
-no rides (A3), and a second private history (A2). The 47-coaster catalogue is reference
-data in a **migration**, not the seed. Hosted projects use `pnpm db:seed:remote`, which
-parses `seed.sql` so the two environments cannot drift.
+**Deviations from the first design.** The original model used integer keys, which cannot
+work once Supabase Auth issues UUIDs for every account. It also had `email` and
+`password` columns on a `users` table, both dropped: Auth owns credentials, and a
+readable email column is an easy way to find out which addresses are registered. The
+leaderboard was going to group by username and now groups by id as well, so two members
+sharing a name are never folded into one row. Admin access to ride history was left open
+in the first draft and was settled by giving admins no policy on `ride` at all.
 
-## 6. Changes from the original design
+**Secrets (AC5).** Only two variables reach the browser, both prefixed `NEXT_PUBLIC_`:
+the project URL and the anon key. The anon key is meant to be public, since RLS is what
+decides what its bearer can actually read. The service-role key bypasses RLS completely,
+so it is never in `.env.local`, never prefixed and never imported by the app — the only
+thing that reads it is `scripts/seed-remote.mjs`, from the shell.
 
-| Original | Shipped | Why |
-|---|---|---|
-| Integer primary keys | UUIDs | Supabase Auth issues UUIDs |
-| `email` / `password` columns | Neither exists | Auth owns credentials; a readable email column is an enumeration vector |
-| A `users` table | `profiles`, keyed to `auth.users.id` | Avoids colliding with Auth's own table |
-| View grouped by `p.username` | `group by p.id, p.username` | Two members with one name would merge into one row |
-| "Admins have no dashboard (TBD)" | **No policy on `ride`** | Blindness by silence beats a rule denying them |
-| Credits "via views or RPC" | View for the board, `lib/stats.ts` for the dashboard | Same rule, two read paths, no stored total |
-| Not specified | Column privileges for the escalation guard | RLS cannot express "this row but not this column" |
-| Not specified | Definer-rights `public_leaderboard` | Lets `anon` read counts without row access to `ride` |
-| Not specified | Email confirmation, PKCE callback, silent no-op signup | Hosted Supabase defaults + enumeration protection |
+**Free-tier limits, if this grew.** A free Supabase project pauses after inactivity, and
+the page that would go down is the public one, where there is no signed-in user to
+notice. There is no point-in-time recovery either, so a lost ride history stays lost.
+The first thing to struggle would be the leaderboard, which recounts every distinct
+coaster across `ride` on each visit to `/`. That is the right trade at this size, since
+a stored total is a desynchronisation bug waiting to happen, but past roughly a million
+rides it would want a materialised view refreshed on a schedule. Vercel Hobby is
+non-commercial, so a real launch would need a different plan there as well.
+
+**Not built, per SOW §4:** live RCDB integration, native apps, password reset beyond
+Supabase's own, payments. English only.
