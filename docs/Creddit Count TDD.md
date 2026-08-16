@@ -149,8 +149,8 @@ await supabase.auth.getUser();   // never getSession(): that is a cookie the cli
 export const creditCount = (rides) => ridesPerCoaster(rides).size;  // distinct coasters
 ```
 
-Credits are never written down anywhere. There is no `credit_count` column and no
-`credits` table: `lib/stats.ts` derives them for the dashboard and the view derives them
+Credits are never written down anywhere. There is no credit_count column and no
+credits table: `lib/stats.ts` derives them for the dashboard and the view derives them
 for the board, so the two numbers cannot fall out of sync. Logging a ride takes three
 interactions — **Log a ride** → pick a coaster → **Save ride** — since the date defaults
 to today and the catalogue is filtered in the browser.
@@ -161,12 +161,12 @@ Testing was split into four layers, since each one can only prove part of it. Th
 database layers are the ones that matter most, because they check the rules where the
 rules actually live.
 
-| Layer | Location | Count | Proves |
-|---|---|---|---|
-| pgTAP | `supabase/tests/` | 45 | Policies, grants, constraints, per role |
-| RLS integration | `tests/rls/` | 34 | The same rules through real JWTs and PostgREST |
-| Unit | `tests/unit/` | 49 | Derivation, validation, seed parity — no database |
-| Walkthrough | `scripts/walkthrough.mjs` | 3 roles | Server components + `proxy.ts` + RLS together |
+| Layer           | Location                  | Count   | Proves                                            |
+| --------------- | ------------------------- | ------- | ------------------------------------------------- |
+| pgTAP           | `supabase/tests/`         | 45      | Policies, grants, constraints, per role           |
+| RLS integration | `tests/rls/`              | 34      | The same rules through real JWTs and PostgREST    |
+| Unit            | `tests/unit/`             | 49      | Derivation, validation, seed parity — no database |
+| Walkthrough     | `scripts/walkthrough.mjs` | 3 roles | Server components + `proxy.ts` + RLS together     |
 
 The way a blocked operation behaves is what decides how each assertion is written: a
 blocked select comes back as an empty array with no error, a blocked insert returns
@@ -182,36 +182,11 @@ select set_eq($$select column_name from information_schema.columns
                 where table_name = 'public_leaderboard'$$, array['display_name','credit_count']);
 ```
 
-The seed data is deterministic, and every fixture in it is there for a reason: 62 rides
-across 36 credits so the two numbers disagree, 16 members on the board so the page's
-limit of 15 is actually reached, one member opted in with no rides, and one admin with
-none at all. The 47-coaster catalogue is reference data that every environment needs, so
-it lives in a **migration** rather than in the seed.
+Seed data was created for coasters while an integration with an external API was left out. Seed data for users and rides are also placed to make the app look populated, check the credit calculations work correctly and the whole UI looks fine.
 
-## 6. Deviations, secrets and limits
+## 6. Limits
 
-**Deviations from the first design.** The original model used integer keys, which cannot
-work once Supabase Auth issues UUIDs for every account. It also had `email` and
-`password` columns on a `users` table, both dropped: Auth owns credentials, and a
-readable email column is an easy way to find out which addresses are registered. The
-leaderboard was going to group by username and now groups by id as well, so two members
-sharing a name are never folded into one row. Admin access to ride history was left open
-in the first draft and was settled by giving admins no policy on `ride` at all.
+**Email Verification:** For testing purpouses, simplicity and free tier limits in Supabase, the email verification was not enabled on purpose, but it is a good authentication step to handle in a production environment.
 
-**Secrets (AC5).** Only two variables reach the browser, both prefixed `NEXT_PUBLIC_`:
-the project URL and the anon key. The anon key is meant to be public, since RLS is what
-decides what its bearer can actually read. The service-role key bypasses RLS completely,
-so it is never in `.env.local`, never prefixed and never imported by the app — the only
-thing that reads it is `scripts/seed-remote.mjs`, from the shell.
-
-**Free-tier limits, if this grew.** A free Supabase project pauses after inactivity, and
-the page that would go down is the public one, where there is no signed-in user to
-notice. There is no point-in-time recovery either, so a lost ride history stays lost.
-The first thing to struggle would be the leaderboard, which recounts every distinct
-coaster across `ride` on each visit to `/`. That is the right trade at this size, since
-a stored total is a desynchronisation bug waiting to happen, but past roughly a million
-rides it would want a materialised view refreshed on a schedule. Vercel Hobby is
-non-commercial, so a real launch would need a different plan there as well.
-
-**Not built, per SOW §4:** live RCDB integration, native apps, password reset beyond
+**Not built, per SOW 4:** live RCDB integration, native apps, password reset beyond
 Supabase's own, payments. English only.
